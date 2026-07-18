@@ -1,27 +1,38 @@
 # Road to Sub-3:50 — Marathon Training Dashboard
 
-A Streamlit dashboard built around a 9-month "Marathon Training Plan v2":
-three phases (Recovery & Base → Aerobic Build → Marathon Specific), HR-zone
-driven training, a Sub-3:50 primary goal and a Sub-3:35 stretch goal decided at
-the Month 6 tune-up half marathon.
+A Streamlit dashboard for a marathon build (race day **8 Dec 2026**), driven by
+**training plan v3**: Base/Rebuild (complete) → Build → Peak → Taper, with a
+Sub-3:50 primary goal and a 3:40 / 3:35 decision gate at the early-October
+tune-up half marathon.
 
-## What it does
+Everything plan-related loads from JSON — no dates or targets are hardcoded:
 
-- **Overview** — days to race, current month/phase/week, this week's sessions
-  for the current phase, weekly target vs. logged km, monthly milestone.
-- **Log runs** — upload a Garmin/Strava/Coros **screenshot** and Claude extracts
-  date, distance, time, HR, and cadence (needs an `ANTHROPIC_API_KEY` secret);
-  or type runs in manually. The log is editable in-place and every save is a
-  commit of `data/runs.csv` back to this repo.
-- **Progress** — weekly volume vs. the plan's 25→60 km build, long-run
-  progression toward the 32 km peak, and Z2 efficiency (avg HR on easy/long
-  runs against the 128–141 bpm band).
-- **Training plan** — the full plan: phase cards, weekly session structure,
-  Karvonen HR zones (max 179 / rest 52), monthly milestones, running-economy
-  targets, golden rules.
-- **Race strategy** — the 5:40 → 5:30 → 5:25 → 5:20 pacing plan, gut-check
-  splits, the 6-gel plan, and performance projections. A sidebar toggle switches
-  every pace to the Sub-3:35 stretch plan (~10 s/km faster).
+| File | Purpose |
+|---|---|
+| `data/training_plan_v3.json` | Phases, weekly-km bands, long-run ladders, tune-up decision rule, taper |
+| `data/athlete_profile.json` | HR zones (Garmin 265), PRs, shoes, fueling, grading conventions, heat model |
+| `data/runs.csv` | The run log — 28 historical sessions plus everything logged via the app |
+
+## What's on it
+
+- **Overview** — race countdown, phase timeline with a today-marker, current
+  phase card (weekly template, key sessions, exit criteria), next long run.
+- **Log runs** — Garmin screenshot → Claude extracts distance/time/HR/cadence/
+  VO/GCT (needs `ANTHROPIC_API_KEY`); full manual form incl. surface, feels-like
+  °C, shoe, grade, and HR-halves for drift tracking. Every save commits
+  `data/runs.csv` back to the repo.
+- **Progress** — weekly volume vs the phase target band with 10%-rule flags and
+  honest gap annotations (illness/holiday); long-run ladder planned-vs-actual
+  with grade chips; **Efficiency Factor** trend (3-run MA, split by surface);
+  pace-vs-HR scatter with the Z2 band; grade-GPA trend; cadence/VO/GCT form
+  panel; cardiac-drift table; shoe mileage. Heat-adjusted pace toggle
+  (~2.5 s/km per °C of feels-like above 28).
+- **Training plan** — phase cards, the full long-run ladder, Garmin-265 HR
+  zones (provisional until the LTHR field test), pace reference, taper
+  structure, environment notes, golden rules.
+- **Race day** — three goal targets with the October decision gate, a Riegel
+  race predictor that activates once the tune-up HM is logged (`race_hm`),
+  pacing plan per goal, gut-check splits, fueling protocol.
 
 ## Run it locally
 
@@ -30,40 +41,27 @@ pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-Without any secrets the app works fully — runs are saved to the local
-`data/runs.csv` (and you can download the CSV from the Log runs tab).
-
 ## Deploy on Streamlit Community Cloud
 
-1. Go to [share.streamlit.io](https://share.streamlit.io) → **New app** → pick
-   this repo/branch → main file `streamlit_app.py`.
-2. In the app's **Settings → Secrets**, add:
+Deploy `streamlit_app.py` from `main`, then add secrets (Settings → Secrets):
 
 ```toml
-# enables screenshot parsing (optional)
-ANTHROPIC_API_KEY = "sk-ant-..."
-
-# enables saving runs back to this repo (optional but recommended —
-# Streamlit Cloud storage is wiped between sessions)
-GITHUB_TOKEN = "github_pat_..."   # fine-grained PAT, Contents: Read & write on this repo
+ANTHROPIC_API_KEY = "sk-ant-..."   # screenshot parsing (optional)
+GITHUB_TOKEN = "github_pat_..."    # run-log commits to this repo (recommended)
 GITHUB_REPO = "dnhoswork-ui/Marathon-Training"
 GITHUB_BRANCH = "main"
 ```
 
-With `GITHUB_TOKEN` set, every saved run is committed to `data/runs.csv`, so
-your history is versioned and survives app restarts. Without it, use the
-**Download runs.csv** button as a manual backup.
+The token is a fine-grained PAT scoped to this repo with **Contents: Read and
+write**. Without it the app still works, but runs logged on Streamlit Cloud
+don't survive restarts (use the Download button as a manual backup).
 
-## Files
+## Conventions baked in
 
-| File | Purpose |
-|---|---|
-| `streamlit_app.py` | The dashboard (tabs, charts, forms) |
-| `plan.py` | The entire training plan as data — edit here to adjust the plan, race date, or targets |
-| `storage.py` | `data/runs.csv` load/save, with GitHub-commit sync |
-| `parser.py` | Claude vision call that turns run screenshots into structured data |
-| `data/runs.csv` | Your run log (committed by the app when GitHub sync is on) |
-
-The plan is anchored on `PLAN_START = 2026-04-06` with months modeled as 4-week
-blocks, putting race day (2026-12-06) in Month 9. Edit both dates in `plan.py`
-if the actual race differs.
+- Treadmill and outdoor are never mixed in pace/EF comparisons (treadmill runs
+  ~15–20 s/km easier).
+- The race row and the one approx-date row are excluded from fitness trends.
+- Illness (25 Apr–13 May) and holiday (15–24 Jun) are annotated as real gaps,
+  never interpolated.
+- Zones change only via a field test — the app flags them as provisional until
+  the Phase 2 week-1 LTHR test is done.

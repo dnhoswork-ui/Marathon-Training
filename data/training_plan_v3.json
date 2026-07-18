@@ -1,0 +1,235 @@
+{
+  "meta": {
+    "version": "3.0",
+    "generated": "2026-07-18",
+    "supersedes": "Optimised Marathon Plan v2 (9-month, Sub-3:50)",
+    "changes_from_v2": [
+      "Phase 1 marked COMPLETE (ends 19 Jul) - 18km long run done, outdoor transition made",
+      "Phase 2 entry volume recalibrated to actual ~30-35 km/wk (v2 assumed 40 km/wk exit)",
+      "HR zones rebased to Garmin 265: LTHR 173, Max 193, Z2 138-154 (v2 used old-device zones)",
+      "LTHR 30-min field test scheduled Phase 2 week 1 before any tempo work",
+      "Strength 2x/week starts NOW (was planned Month 2, not yet started)",
+      "Tune-up HM moved to early Oct (Phase 3 wk 2) as 3:40/3:35 stretch decision point",
+      "Long-run ladder rebuilt week-by-week with down weeks, from actual 18km base"
+    ]
+  },
+  "today": "2026-07-18",
+  "race_date": "2026-12-08",
+  "days_to_race": 143,
+  "current_phase_id": "phase2",
+  "targets": {
+    "primary": "3:50 (5:27/km)",
+    "stretch": "3:35 (5:06/km)"
+  },
+  "phases": [
+    {
+      "id": "phase1",
+      "name": "Base / Rebuild",
+      "status": "complete",
+      "start": "2026-05-14",
+      "end": "2026-07-19",
+      "run_days": 3,
+      "weekly_km": [
+        25,
+        35
+      ],
+      "long_run_peak_km": 18,
+      "outcome": "18km long run achieved. Outdoor-priority transition made. Z2 outdoor 6:40-7:26/km (heat-affected) vs 6:10-6:15 target. Efficiency sharply up: treadmill 5:58/km @ 144 vs 6:45 @ 142 in May."
+    },
+    {
+      "id": "phase2",
+      "name": "Build - Tempo + Long Run Extension",
+      "status": "current",
+      "start": "2026-07-20",
+      "end": "2026-09-20",
+      "weeks": 9,
+      "run_days": 3,
+      "strength_days": 2,
+      "weekly_km": [
+        35,
+        48
+      ],
+      "long_run_km": [
+        20,
+        28
+      ],
+      "week_1_special": "30-min LTHR field test (10 min warm-up, 30 min max sustainable effort; avg HR of final 20 min = LTHR). Replaces tempo. Lock zones before tempo begins.",
+      "key_sessions": {
+        "tempo": "Weekly from week 2. 20 -> 35 min continuous. Outdoor 5:30 -> 5:15/km (treadmill equivalent 5:20 -> 5:10). Shoe: Feidian 6C.",
+        "long": "Saturday, Z2 controlled progression. Gels on every run >= 16km. Shoe: Nimbus 25.",
+        "easy": "Monday, Z2 8-10km outdoor, HR 138-150."
+      },
+      "weekly_template": {
+        "Mon": "Easy Z2 8-10km outdoor",
+        "Tue": "Strength 30 min",
+        "Wed": "Tempo (LTHR test in wk 1)",
+        "Thu": "Rest",
+        "Fri": "Strength 20-30 min or rest",
+        "Sat": "Long run per ladder",
+        "Sun": "Rest"
+      },
+      "long_run_ladder": [
+        {
+          "date": "2026-07-25",
+          "km": 20
+        },
+        {
+          "date": "2026-08-01",
+          "km": 22
+        },
+        {
+          "date": "2026-08-08",
+          "km": 16,
+          "type": "down_week"
+        },
+        {
+          "date": "2026-08-15",
+          "km": 24
+        },
+        {
+          "date": "2026-08-22",
+          "km": 18,
+          "type": "down_week"
+        },
+        {
+          "date": "2026-08-29",
+          "km": 26
+        },
+        {
+          "date": "2026-09-05",
+          "km": 20,
+          "type": "down_week"
+        },
+        {
+          "date": "2026-09-12",
+          "km": 28,
+          "type": "peak"
+        },
+        {
+          "date": "2026-09-19",
+          "km": 22,
+          "type": "transition"
+        }
+      ],
+      "exit_criteria": [
+        "28km long run completed",
+        "Tempo 5:15/km held 30 min",
+        "HR at 6:10-6:15/km outdoor <= 150",
+        "45-48 km/wk absorbed without RHR spike"
+      ]
+    },
+    {
+      "id": "phase3",
+      "name": "Peak - Marathon-Specific",
+      "status": "upcoming",
+      "start": "2026-09-21",
+      "end": "2026-11-15",
+      "weeks": 8,
+      "run_days": 4,
+      "strength_days": 2,
+      "weekly_km": [
+        48,
+        60
+      ],
+      "long_run_km": [
+        22,
+        32
+      ],
+      "key_sessions": {
+        "mp_work": "Marathon-pace (5:27/km) blocks inside long runs, building 6 -> 14km",
+        "tempo": "Progress to 5:00-4:55/km",
+        "fourth_day": "Easy 6-8km added (this is the 4-day/week switch)"
+      },
+      "tune_up": {
+        "window": "2026-10-03/04",
+        "session": "Half marathon, full race effort",
+        "decision_rule": "sub-1:52 hold 3:50 | sub-1:48 open 3:40 | sub-1:46 chase 3:35 stretch"
+      },
+      "long_run_ladder": [
+        {
+          "date": "2026-09-26",
+          "km": 24
+        },
+        {
+          "date": "2026-10-03",
+          "km": 21.1,
+          "type": "tune_up_hm"
+        },
+        {
+          "date": "2026-10-10",
+          "km": 26
+        },
+        {
+          "date": "2026-10-17",
+          "km": 30,
+          "type": "key"
+        },
+        {
+          "date": "2026-10-24",
+          "km": 22,
+          "type": "down_week"
+        },
+        {
+          "date": "2026-10-31",
+          "km": 28
+        },
+        {
+          "date": "2026-11-07",
+          "km": 24
+        },
+        {
+          "date": "2026-11-14",
+          "km": 32,
+          "type": "key_final"
+        }
+      ],
+      "exit_criteria": [
+        "Two 30km+ runs completed",
+        "Full race fueling rehearsed twice on 30km+ runs",
+        "MP 5:27/km feels like Z3, not Z4"
+      ]
+    },
+    {
+      "id": "taper",
+      "name": "Taper",
+      "status": "upcoming",
+      "start": "2026-11-16",
+      "end": "2026-12-08",
+      "weeks": 3,
+      "structure": [
+        {
+          "week": "16-22 Nov",
+          "volume": "-30% (~40km)",
+          "long_run": "20km with final MP block"
+        },
+        {
+          "week": "23-29 Nov",
+          "volume": "-50% (~28km)",
+          "long_run": "14-16km easy + MP strides"
+        },
+        {
+          "week": "30 Nov - 8 Dec",
+          "volume": "~18-20km total",
+          "details": "Race-pace segments Tue/Wed, 4-5km shakeout 2 days out, carb load from Thu, sleep 8-9h. Expect Garmin Training Status -> Peaking."
+        }
+      ]
+    }
+  ],
+  "pace_reference": {
+    "easy_outdoor": "6:30-7:00/km (heat-adjusted)",
+    "easy_treadmill": "6:20-6:40/km",
+    "long_run": "6:10-6:30/km",
+    "tempo_phase2": "5:30 -> 5:15/km",
+    "tempo_phase3": "5:00-4:55/km",
+    "mp_primary": "5:27/km",
+    "mp_stretch": "5:06/km"
+  },
+  "golden_rules": [
+    "80/20: 80% of running stays Z1-Z2",
+    "<= 10% weekly volume increase",
+    "RHR 5+ bpm above 63 baseline = rest day, no exceptions",
+    "Walk through water stops, never pause the timer",
+    "Zones change only when a test says so",
+    "Nothing new on race day - gear, gels, or pacing"
+  ]
+}

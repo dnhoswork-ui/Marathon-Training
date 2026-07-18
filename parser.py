@@ -21,7 +21,10 @@ class RunData(BaseModel):
     duration: Optional[str] = Field(None, description="Moving/elapsed time as H:MM:SS or MM:SS")
     avg_pace: Optional[str] = Field(None, description="Average pace as M:SS per km")
     avg_hr: Optional[int] = Field(None, description="Average heart rate in bpm, or null")
-    cadence: Optional[int] = Field(None, description="Average cadence in steps per minute, or null")
+    cadence_spm: Optional[int] = Field(None, description="Average run cadence in steps per minute, or null")
+    vertical_osc_cm: Optional[float] = Field(None, description="Vertical oscillation in cm, or null")
+    gct_ms: Optional[int] = Field(None, description="Ground contact time in milliseconds, or null")
+    feels_like_c: Optional[float] = Field(None, description="Feels-like temperature in Celsius if shown, or null")
     run_title: Optional[str] = Field(None, description="Activity title or short description shown in the app")
 
 

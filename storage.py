@@ -20,7 +20,13 @@ import streamlit as st
 
 RUNS_PATH = "data/runs.csv"
 LOCAL_RUNS = os.path.join(os.path.dirname(os.path.abspath(__file__)), RUNS_PATH)
-COLUMNS = ["date", "type", "distance_km", "duration", "avg_pace", "avg_hr", "cadence", "notes", "source"]
+COLUMNS = [
+    "date", "date_precision", "phase", "run_type", "surface", "distance_km", "duration",
+    "avg_pace", "pace_sec_per_km", "avg_hr", "cadence_spm", "vertical_osc_cm", "gct_ms",
+    "grade", "grade_points", "shoe", "feels_like_c", "hr_first_half", "hr_second_half", "notes",
+]
+NUMERIC = ["distance_km", "pace_sec_per_km", "avg_hr", "cadence_spm", "vertical_osc_cm",
+           "gct_ms", "grade_points", "feels_like_c", "hr_first_half", "hr_second_half"]
 API = "https://api.github.com"
 
 
@@ -60,9 +66,8 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = None
     df = df[COLUMNS].copy()
     df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
-    df["distance_km"] = pd.to_numeric(df["distance_km"], errors="coerce")
-    df["avg_hr"] = pd.to_numeric(df["avg_hr"], errors="coerce")
-    df["cadence"] = pd.to_numeric(df["cadence"], errors="coerce")
+    for col in NUMERIC:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
     df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
     return df
 
