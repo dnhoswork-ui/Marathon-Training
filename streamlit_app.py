@@ -6,9 +6,17 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+import importlib
+
 import parser as run_parser
 import plan
 import storage
+
+# Streamlit hot-reloads this script but keeps imported modules cached, which
+# strands the app on stale code after a git push — reload them every run
+# (cheap: two small JSON reads).
+for _m in (plan, storage, run_parser):
+    importlib.reload(_m)
 
 st.set_page_config(page_title="Road to Sub-3:50", page_icon="🏃", layout="wide")
 
