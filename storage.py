@@ -22,11 +22,13 @@ RUNS_PATH = "data/runs.csv"
 LOCAL_RUNS = os.path.join(os.path.dirname(os.path.abspath(__file__)), RUNS_PATH)
 COLUMNS = [
     "date", "date_precision", "phase", "run_type", "surface", "distance_km", "duration",
-    "avg_pace", "pace_sec_per_km", "avg_hr", "cadence_spm", "vertical_osc_cm", "gct_ms",
+    "avg_pace", "pace_sec_per_km", "avg_hr", "max_hr", "cadence_spm", "stride_length_m",
+    "vertical_osc_cm", "gct_ms", "avg_power_w", "feel", "perceived_effort",
     "grade", "grade_points", "shoe", "feels_like_c", "hr_first_half", "hr_second_half", "notes",
 ]
-NUMERIC = ["distance_km", "pace_sec_per_km", "avg_hr", "cadence_spm", "vertical_osc_cm",
-           "gct_ms", "grade_points", "feels_like_c", "hr_first_half", "hr_second_half"]
+NUMERIC = ["distance_km", "pace_sec_per_km", "avg_hr", "max_hr", "cadence_spm", "stride_length_m",
+           "vertical_osc_cm", "gct_ms", "avg_power_w", "grade_points", "feels_like_c",
+           "hr_first_half", "hr_second_half"]
 API = "https://api.github.com"
 
 

@@ -92,7 +92,7 @@ if "runs" not in st.session_state:
     st.session_state["runs"] = _df
     st.session_state["runs_source"] = _src
 
-TODAY = date.today()
+TODAY = plan.today()          # Singapore local date, not the server's UTC date
 CUR = plan.display_phase(TODAY)
 DAYS_TO_RACE = (plan.RACE_DATE - TODAY).days
 runs = enrich(st.session_state["runs"])
@@ -254,16 +254,24 @@ with tab_log:
             f_dur = r2[1].text_input("Duration (H:MM:SS)", value=pre.get("duration") or "")
             r3 = st.columns(3)
             f_hr = r3[0].number_input("Avg HR", 0, 220, int(pre.get("avg_hr") or 0))
-            f_cad = r3[1].number_input("Cadence (spm)", 0, 250, int(pre.get("cadence_spm") or 0))
+            f_maxhr = r3[1].number_input("Max HR", 0, 220, int(pre.get("max_hr") or 0))
             f_feels = r3[2].number_input("Feels-like °C", 0.0, 50.0, float(pre.get("feels_like_c") or 0.0), 0.5)
             r4 = st.columns(3)
-            f_vo = r4[0].number_input("Vert. osc (cm)", 0.0, 15.0, float(pre.get("vertical_osc_cm") or 0.0), 0.1)
-            f_gct = r4[1].number_input("GCT (ms)", 0, 400, int(pre.get("gct_ms") or 0))
-            f_grade = r4[2].selectbox("Grade", plan.GRADES)
+            f_cad = r4[0].number_input("Cadence (spm)", 0, 250, int(pre.get("cadence_spm") or 0))
+            f_vo = r4[1].number_input("Vert. osc (cm)", 0.0, 15.0, float(pre.get("vertical_osc_cm") or 0.0), 0.1)
+            f_gct = r4[2].number_input("GCT (ms)", 0, 400, int(pre.get("gct_ms") or 0))
             r5 = st.columns(3)
-            f_shoe = r5[0].selectbox("Shoe", [""] + plan.SHOE_NAMES + ["Other"])
-            f_hr1 = r5[1].number_input("HR 1st half", 0, 220, 0, help="For cardiac-drift tracking on long runs")
-            f_hr2 = r5[2].number_input("HR 2nd half", 0, 220, 0)
+            f_stride = r5[0].number_input("Stride length (m)", 0.0, 2.0,
+                                          float(pre.get("stride_length_m") or 0.0), 0.01)
+            f_power = r5[1].number_input("Avg power (W)", 0, 600, int(pre.get("avg_power_w") or 0))
+            f_shoe = r5[2].selectbox("Shoe", [""] + plan.SHOE_NAMES + ["Other"])
+            r6 = st.columns(4)
+            f_feel = r6[0].selectbox("Feel", ["", "Strong", "Normal", "Weak"])
+            f_rpe = r6[1].selectbox("Perceived effort", [""] + [f"{n}/10" for n in range(1, 11)])
+            f_grade = r6[2].selectbox("Grade", plan.GRADES)
+            f_hr1 = r6[3].number_input("HR 1st half", 0, 220, 0,
+                                       help="With HR 2nd half below, powers cardiac-drift tracking")
+            f_hr2 = st.number_input("HR 2nd half", 0, 220, 0)
             f_notes = st.text_input("Notes", value=pre.get("run_title") or "")
             if st.form_submit_button("Save run", type="primary"):
                 mins = duration_to_min(f_dur)
@@ -274,8 +282,11 @@ with tab_log:
                     "phase": p["id"] if p else "", "run_type": f_type, "surface": f_surface,
                     "distance_km": round(f_dist, 2) or None, "duration": f_dur.strip() or None,
                     "avg_pace": fmt_pace(pace_s) if pace_s else None, "pace_sec_per_km": pace_s,
-                    "avg_hr": f_hr or None, "cadence_spm": f_cad or None,
+                    "avg_hr": f_hr or None, "max_hr": f_maxhr or None,
+                    "cadence_spm": f_cad or None, "stride_length_m": f_stride or None,
                     "vertical_osc_cm": f_vo or None, "gct_ms": f_gct or None,
+                    "avg_power_w": f_power or None,
+                    "feel": f_feel or None, "perceived_effort": f_rpe or None,
                     "grade": f_grade or None,
                     "grade_points": plan.GPA_MAP.get(f_grade) if f_grade else None,
                     "shoe": f_shoe or None, "feels_like_c": f_feels or None,
@@ -356,8 +367,15 @@ with tab_prog:
 
         s = st.columns(5)
         s[0].metric("Runs logged", f"{len(running)}")
-        s[1].metric("Most recent run", f"{last_date:%d %b}",
-                    delta="today" if days_since == 0 else f"{days_since} days ago", delta_color="off")
+        if days_since < 0:
+            recency = f"dated {-days_since}d ahead"
+        elif days_since == 0:
+            recency = "today"
+        elif days_since == 1:
+            recency = "yesterday"
+        else:
+            recency = f"{days_since} days ago"
+        s[1].metric("Most recent run", f"{last_date:%d %b}", delta=recency, delta_color="off")
         s[2].metric("Last 7 days", f"{last7['distance_km'].sum():.1f} km",
                     delta=f"{len(last7)} runs", delta_color="off")
         s[3].metric("Last 28 days", f"{last28['distance_km'].sum():.0f} km",
@@ -368,6 +386,12 @@ with tab_prog:
         if not synced:
             st.warning("**Runs are only in this app's temporary storage** — they'll vanish when the app "
                        "restarts. Add the `GITHUB_TOKEN` secret to commit every run to the repo.")
+
+        future = running[running["date"] > TODAY]
+        if not future.empty:
+            st.info(f"📅 {len(future)} run(s) are dated **after today ({TODAY:%d %b}, Singapore time)** — "
+                    f"latest is {future['date'].max():%d %b}. They're included in totals, but check the "
+                    "dates are right: a wrong date puts a run in the wrong training week.")
 
         with st.expander(f"🔍 Check your latest uploads — newest {min(8, len(running))} runs",
                          expanded=days_since <= 2):

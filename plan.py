@@ -9,7 +9,8 @@ Never hardcode phase dates here — read them from the JSON.
 
 import json
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 _BASE = os.path.dirname(os.path.abspath(__file__))
 
@@ -23,6 +24,14 @@ PLAN = _load("training_plan_v3.json")
 PROFILE = _load("athlete_profile.json")
 
 RACE_DATE = date.fromisoformat(PLAN["race_date"])
+
+# Streamlit Cloud runs on UTC; the athlete trains in Singapore (UTC+8), so a
+# morning run there is "tomorrow" to a UTC server. Anchor the app to local time.
+TZ = ZoneInfo({"Singapore": "Asia/Singapore"}.get(PROFILE.get("location", ""), "UTC"))
+
+
+def today() -> date:
+    return datetime.now(TZ).date()
 PHASES = PLAN["phases"]
 GOLDEN_RULES = PLAN["golden_rules"]
 PACE_REFERENCE = PLAN["pace_reference"]
