@@ -296,181 +296,353 @@ with tab_log:
 # ---------------------------------------------------------------- progress
 with tab_prog:
     if running.empty:
-        st.info("No runs logged yet.")
-        st.stop()
+        st.info("No runs logged yet — add one in the **Log runs** tab and this fills in.")
+    else:
+        # ---- data status: did my upload land? ------------------------------
+        last_date = running["date"].max()
+        days_since = (TODAY - last_date).days
+        last7 = running[running["date"] > TODAY - timedelta(days=7)]
+        last28 = running[running["date"] > TODAY - timedelta(days=28)]
+        src = st.session_state["runs_source"]
+        synced = src.startswith("GitHub")
 
-    heat_on = st.toggle(
-        "🌡 Heat-adjusted paces",
-        help=f"Subtracts ~{plan.HEAT_S_PER_KM_PER_C:g} s/km per °C of feels-like above "
-             f"{plan.HEAT_THRESHOLD_C:g} °C, where logged. {plan.ENVIRONMENT['heat_effect']}")
-    R = heat_adjusted(running, heat_on)
-    pool = trend_pool(R)
+        s = st.columns(5)
+        s[0].metric("Runs logged", f"{len(running)}")
+        s[1].metric("Most recent run", f"{last_date:%d %b}",
+                    delta="today" if days_since == 0 else f"{days_since} days ago", delta_color="off")
+        s[2].metric("Last 7 days", f"{last7['distance_km'].sum():.1f} km",
+                    delta=f"{len(last7)} runs", delta_color="off")
+        s[3].metric("Last 28 days", f"{last28['distance_km'].sum():.0f} km",
+                    delta=f"{len(last28)} runs", delta_color="off")
+        s[4].metric("Saved to", "GitHub ✅" if synced else "Local ⚠️",
+                    delta=src.replace("GitHub · ", ""), delta_color="off")
 
-    # ---- weekly volume vs band + 10% flags (feature 4)
-    st.subheader("Weekly volume vs plan band")
-    wsum = R.groupby("week", as_index=False)["distance_km"].sum().rename(columns={"distance_km": "km"})
-    all_weeks = pd.date_range(wsum["week"].min(), plan.RACE_DATE, freq="W-MON").date
-    vol = pd.DataFrame({"week": all_weeks}).merge(wsum, on="week", how="left").fillna({"km": 0})
-    bands = [plan.weekly_band(w) for w in vol["week"]]
-    vol["lo"] = [b[0] if b else None for b in bands]
-    vol["hi"] = [b[1] if b else None for b in bands]
-    prev = vol["km"].shift(1)
-    vol["breach"] = (prev > 10) & (vol["km"] > prev * 1.10)
-    vol["week_str"] = vol["week"].astype(str)
+        if not synced:
+            st.warning("**Runs are only in this app's temporary storage** — they'll vanish when the app "
+                       "restarts. Add the `GITHUB_TOKEN` secret to commit every run to the repo.")
 
-    band_area = alt.Chart(vol.dropna(subset=["lo"])).mark_area(color=C_BAND, opacity=0.25).encode(
-        x=alt.X("week:T", title=None, axis=AXIS), y=alt.Y("lo:Q", title="km/week", axis=AXIS), y2="hi:Q")
-    gap_df = pd.DataFrame([{"s": str(s), "e": str(e), "label": lab} for s, e, lab in plan.GAPS])
-    gap_rects = alt.Chart(gap_df).mark_rect(color=C_MUTED, opacity=0.12).encode(
-        x="s:T", x2="e:T", tooltip=["label:N"])
-    gap_text = alt.Chart(gap_df).mark_text(dy=-80, angle=270, color=C_MUTED, fontSize=10).encode(
-        x="s:T", text="label:N")
-    vbars = alt.Chart(vol[vol["km"] > 0]).mark_bar(width=8, cornerRadiusTopLeft=3, cornerRadiusTopRight=3,
-                                                   color=C_OUT).encode(
-        x="week:T", y="km:Q",
-        tooltip=[alt.Tooltip("week:T", title="Week of"), alt.Tooltip("km:Q", format=".1f"),
-                 alt.Tooltip("lo:Q", title="Band lo", format=".0f"),
-                 alt.Tooltip("hi:Q", title="Band hi", format=".0f")])
-    flags = alt.Chart(vol[vol["breach"]]).mark_text(text="⚠", dy=-10, fontSize=14, color=C_CRIT).encode(
-        x="week:T", y="km:Q", tooltip=alt.value("More than +10% vs previous week"))
-    st.altair_chart((band_area + gap_rects + gap_text + vbars + flags + alt.Chart(
-        pd.DataFrame({"d": [str(TODAY)]})).mark_rule(color=C_CRIT, strokeWidth=1.5).encode(x="d:T"))
-        .properties(height=240).configure_view(strokeWidth=0), use_container_width=True)
-    st.caption("🟦 bars = logged km · shaded band = phase target · ⚠ = 10%-rule breach · gray blocks = illness/holiday (real gaps, not missing data)")
+        with st.expander(f"🔍 Check your latest uploads — newest {min(8, len(running))} runs",
+                         expanded=days_since <= 2):
+            recent = running.sort_values("date", ascending=False).head(8).copy()
+            recent["pace"] = recent["pace_sec_per_km"].map(fmt_pace)
+            st.dataframe(
+                recent[["date", "run_type", "surface", "distance_km", "pace", "avg_hr",
+                        "feels_like_c", "grade", "notes"]],
+                hide_index=True, use_container_width=True,
+                column_config={"distance_km": st.column_config.NumberColumn("km", format="%.2f"),
+                               "feels_like_c": st.column_config.NumberColumn("feels °C", format="%.0f")})
+            st.caption("If a run you just logged isn't here, it didn't save — check the message on the "
+                       "Log runs tab, then press **↻ Reload data** in the sidebar.")
 
-    # ---- long-run ladder (feature 5)
-    st.subheader("Long-run ladder — planned vs actual")
-    ladder = pd.DataFrame(plan.full_ladder())
-    ladder["date"] = pd.to_datetime(ladder["date"])
-    ladder["kind"] = ladder["type"].fillna("build") if "type" in ladder else "build"
-    actual_lr = R[R["run_type"].isin(["long", "race_hm"])].copy()
-    plan_line = alt.Chart(ladder).mark_line(color=C_MUTED, strokeWidth=1.5, point=alt.OverlayMarkDef(
-        color=C_MUTED, size=45)).encode(
-        x=alt.X("date:T", title=None, axis=AXIS),
-        y=alt.Y("km:Q", title="km", axis=AXIS),
-        tooltip=[alt.Tooltip("date:T"), alt.Tooltip("km:Q"), alt.Tooltip("kind:N", title="type")])
-    act_pts = alt.Chart(actual_lr).mark_point(filled=True, size=90, color=C_OUT, stroke="#ffffff",
-                                              strokeWidth=2).encode(
-        x="date:T", y="distance_km:Q",
-        tooltip=[alt.Tooltip("date:T"), alt.Tooltip("distance_km:Q", title="km", format=".1f"),
-                 alt.Tooltip("grade:N"), alt.Tooltip("avg_hr:Q", title="avg HR"),
-                 alt.Tooltip("notes:N")])
-    act_line = alt.Chart(actual_lr).mark_line(color=C_OUT, strokeWidth=2).encode(x="date:T", y="distance_km:Q")
-    chips = alt.Chart(actual_lr.dropna(subset=["grade"])).mark_text(dy=-14, fontSize=10, fontWeight=600,
-                                                                    color="#52514e").encode(
-        x="date:T", y="distance_km:Q", text="grade:N")
-    lr_today = alt.Chart(pd.DataFrame({"d": [str(TODAY)]})).mark_rule(color=C_CRIT, strokeWidth=1.5).encode(x="d:T")
-    st.altair_chart((plan_line + act_line + act_pts + chips + lr_today).properties(height=260)
-                    .configure_view(strokeWidth=0), use_container_width=True)
-    st.caption("⬜ gray = planned ladder (down weeks included, 32 km peak on 14 Nov) · 🟦 blue = actual long runs with grade chips")
+        st.divider()
 
-    col1, col2 = st.columns(2)
-    with col1:
-        # ---- EF trend (feature 2)
-        st.subheader("Efficiency Factor (3-run MA)")
-        ef = pool.dropna(subset=["pace_adj", "avg_hr"]).copy()
-        ef = ef[ef["run_type"].isin(["easy", "long"])].sort_values("date")
-        ef["EF"] = (1000 / ef["pace_adj"] * 60) / ef["avg_hr"]
-        ef["EF_ma"] = ef.groupby("surface")["EF"].transform(lambda s: s.rolling(3, min_periods=1).mean())
-        ef_chart = alt.Chart(ef).mark_line(strokeWidth=2, point=alt.OverlayMarkDef(
-            size=55, filled=True, stroke="#ffffff", strokeWidth=2)).encode(
-            x=alt.X("date:T", title=None, axis=AXIS),
-            y=alt.Y("EF_ma:Q", title="m/min per bpm", scale=alt.Scale(zero=False), axis=AXIS),
-            color=alt.Color("surface:N", scale=SURF_SCALE,
-                            legend=alt.Legend(orient="top", title=None)),
-            tooltip=[alt.Tooltip("date:T"), alt.Tooltip("surface:N"),
-                     alt.Tooltip("EF:Q", format=".3f"), alt.Tooltip("EF_ma:Q", title="3-run MA", format=".3f"),
-                     alt.Tooltip("avg_pace:N", title="pace"), alt.Tooltip("avg_hr:Q")])
-        st.altair_chart(ef_chart.properties(height=230).configure_view(strokeWidth=0), use_container_width=True)
-        st.caption("Higher = more speed per heartbeat — the honest fitness signal when pace and HR move together. Compare within a surface only.")
+        # ---- controls -----------------------------------------------------
+        ctl = st.columns([2, 2, 3])
+        heat_on = ctl[0].toggle(
+            "🌡 Heat-adjust paces",
+            help=f"Subtracts ~{plan.HEAT_S_PER_KM_PER_C:g} s/km per °C of feels-like above "
+                 f"{plan.HEAT_THRESHOLD_C:g}°C, where logged. {plan.ENVIRONMENT['heat_effect']}")
+        ma_n = ctl[1].selectbox("Moving average", [3, 5, 7], index=0,
+                                format_func=lambda n: f"{n}-run MA")
+        surf_pick = ctl[2].radio("Surface", ["Outdoor only", "Both (never mixed)"],
+                                 horizontal=True,
+                                 help="Treadmill runs are ~15–20 s/km easier than outdoor Singapore — "
+                                      "they're always kept on separate lines, never averaged together.")
 
-    with col2:
-        # ---- pace vs HR scatter (feature 3)
-        st.subheader("Pace vs HR — the aerobic curve")
-        sc = pool.dropna(subset=["pace_adj", "avg_hr"])
-        z2band = alt.Chart(pd.DataFrame({"lo": [plan.Z2[0]], "hi": [plan.Z2[1]]})).mark_rect(
-            color=C_OUT, opacity=0.08).encode(
-            y=alt.Y("lo:Q", scale=alt.Scale(domain=[125, 175])), y2="hi:Q")
-        train_rule = alt.Chart(pd.DataFrame({"y": [plan.Z2_TRAIN[1]]})).mark_rule(
-            color=C_MUTED, strokeDash=[1, 0], strokeWidth=1).encode(y="y:Q")
-        pts = alt.Chart(sc).mark_point(filled=True, opacity=0.85, stroke="#ffffff", strokeWidth=1.5).encode(
-            x=alt.X("pace_adj:Q", title="pace (min/km)" + (" · heat-adjusted" if heat_on else ""),
-                    scale=alt.Scale(domain=[330, 530]),
-                    axis=alt.Axis(gridColor=C_GRID, labelColor=C_MUTED, titleColor=C_MUTED,
-                                  labelExpr=PACE_LABEL, tickCount=6)),
-            y=alt.Y("avg_hr:Q", title="avg HR", scale=alt.Scale(domain=[125, 175]), axis=AXIS),
-            color=alt.Color("surface:N", scale=SURF_SCALE, legend=alt.Legend(orient="top", title=None)),
-            size=alt.Size("distance_km:Q", legend=None, scale=alt.Scale(range=[40, 350])),
-            tooltip=[alt.Tooltip("date:T"), alt.Tooltip("run_type:N"), alt.Tooltip("surface:N"),
-                     alt.Tooltip("avg_pace:N", title="pace"), alt.Tooltip("avg_hr:Q"),
-                     alt.Tooltip("distance_km:Q", format=".1f"), alt.Tooltip("grade:N")])
-        st.altair_chart((z2band + train_rule + pts).properties(height=230).configure_view(strokeWidth=0),
-                        use_container_width=True)
-        st.caption(f"Shaded = Z2 ({plan.Z2[0]}–{plan.Z2[1]}), line = train-to ceiling {plan.Z2_TRAIN[1]}. "
-                   "Progress = the cloud shifting left (faster) inside the band. Dot size = distance.")
+        R = heat_adjusted(running, heat_on)
+        pool = trend_pool(R)
+        if surf_pick == "Outdoor only":
+            pool = pool[pool["surface"] == "outdoor"]
 
-    col3, col4 = st.columns(2)
-    with col3:
-        # ---- grade GPA trend (feature 7)
-        st.subheader("Run quality — grade GPA (3-run MA)")
-        gp = R.dropna(subset=["grade_points"]).sort_values("date").copy()
-        gp["GPA_ma"] = gp["grade_points"].rolling(3, min_periods=1).mean()
-        gpa_chart = alt.Chart(gp).mark_line(color=C_OUT, strokeWidth=2, point=alt.OverlayMarkDef(
-            color=C_OUT, size=50, stroke="#ffffff", strokeWidth=2)).encode(
-            x=alt.X("date:T", title=None, axis=AXIS),
-            y=alt.Y("GPA_ma:Q", title="GPA", scale=alt.Scale(domain=[2.0, 4.4]), axis=AXIS),
-            tooltip=[alt.Tooltip("date:T"), alt.Tooltip("grade:N"),
-                     alt.Tooltip("GPA_ma:Q", title="3-run MA", format=".2f"), alt.Tooltip("notes:N")])
-        st.altair_chart(gpa_chart.properties(height=210).configure_view(strokeWidth=0), use_container_width=True)
-        st.caption("A+ = 4.3 … C = 2.0, per your grading convention.")
+        def add_ef(d: pd.DataFrame) -> pd.DataFrame:
+            d = d.dropna(subset=["pace_adj", "avg_hr"]).sort_values("date").copy()
+            d["EF"] = (1000 / d["pace_adj"] * 60) / d["avg_hr"]
+            d["EF_ma"] = d.groupby("surface")["EF"].transform(
+                lambda x: x.rolling(ma_n, min_periods=1).mean())
+            d["pace_ma"] = d.groupby("surface")["pace_adj"].transform(
+                lambda x: x.rolling(ma_n, min_periods=1).mean())
+            d["hr_ma"] = d.groupby("surface")["avg_hr"].transform(
+                lambda x: x.rolling(ma_n, min_periods=1).mean())
+            return d
 
-    with col4:
-        # ---- cardiac drift (feature 9)
-        st.subheader("Cardiac drift — long runs")
-        drift = R[(R["run_type"] == "long")].dropna(subset=["hr_first_half", "hr_second_half"]).copy()
-        if drift.empty:
-            st.info("Log **HR 1st half / 2nd half** on long runs (form fields exist) — target drift "
-                    "< 15 bpm. The HM race showed ~22 bpm.")
+        aer = add_ef(pool[pool["run_type"].isin(["easy", "long"])])
+
+        # ---- improvement scorecard ---------------------------------------
+        st.subheader("Am I improving?")
+        st.caption(f"Comparing your **last {ma_n} outdoor easy/long runs** with the {ma_n} before them. "
+                   "Outdoor-only so heat and surface don't fake a trend"
+                   + (" · heat-adjusted" if heat_on else "") + ".")
+        out = aer[aer["surface"] == "outdoor"]
+        if len(out) >= ma_n * 2:
+            now, prev = out.tail(ma_n), out.tail(ma_n * 2).head(ma_n)
+            m = st.columns(4)
+            ef_d = now["EF"].mean() - prev["EF"].mean()
+            m[0].metric("Efficiency Factor", f"{now['EF'].mean():.3f}",
+                        delta=f"{ef_d:+.3f} m/min per bpm",
+                        help="Speed per heartbeat. The cleanest fitness signal — it rises when you get "
+                             "faster at the same HR, or hold the same pace at a lower HR.")
+            pace_d = now["pace_adj"].mean() - prev["pace_adj"].mean()
+            m[1].metric("Z2 pace", f"{fmt_pace(now['pace_adj'].mean())}/km",
+                        delta=f"{pace_d:+.0f} s/km", delta_color="inverse")
+            hr_d = now["avg_hr"].mean() - prev["avg_hr"].mean()
+            m[2].metric("Avg HR on those runs", f"{now['avg_hr'].mean():.0f} bpm",
+                        delta=f"{hr_d:+.0f} bpm", delta_color="inverse")
+            gap = now["pace_adj"].mean() - 372.5  # 6:12/km midpoint of the 6:10–6:15 goal
+            m[3].metric("Gap to 6:10–6:15 goal", f"{gap:+.0f} s/km",
+                        delta="on target ✅" if gap <= 3 else "keep building", delta_color="off")
+            st.caption("↑ EF is good; ↓ pace and ↓ HR are good (green either way). "
+                       "The goal band is the plan's outdoor Z2 target of 6:10–6:15/km.")
         else:
-            drift["drift"] = drift["hr_second_half"] - drift["hr_first_half"]
-            drift["status"] = drift["drift"].map(lambda d: "✅ good" if d < 15 else "🔴 high")
-            st.dataframe(drift[["date", "distance_km", "hr_first_half", "hr_second_half", "drift", "status"]],
-                         hide_index=True, use_container_width=True)
-            st.caption("Target < 15 bpm between halves at steady effort.")
+            st.info(f"Need at least {ma_n * 2} outdoor easy/long runs to compare windows — "
+                    f"you have {len(out)}. Log a few more and this fills in.")
 
-    # ---- form panel (feature 6)
-    st.subheader("Running form vs targets")
-    f1, f2, f3 = st.columns(3)
-    def _spark(col, field, title, lo=None, hi=None, target_text=""):
-        d = R.dropna(subset=[field]).sort_values("date")
-        with col:
-            if d.empty:
-                st.info(f"No {title} data yet.")
-                return
-            layers = []
-            if lo is not None:
-                layers.append(alt.Chart(pd.DataFrame({"lo": [lo], "hi": [hi]})).mark_rect(
-                    color=C_TM, opacity=0.10).encode(y=alt.Y("lo:Q", scale=alt.Scale(zero=False)), y2="hi:Q"))
-            layers.append(alt.Chart(d).mark_line(color=C_OUT, strokeWidth=2, point=alt.OverlayMarkDef(
-                color=C_OUT, size=40, stroke="#ffffff", strokeWidth=2)).encode(
+        st.divider()
+
+        # ---- efficiency factor: raw + MA, newest ringed -------------------
+        st.subheader("Efficiency Factor — the real fitness trend")
+        if aer.empty:
+            st.info("Log pace + avg HR on easy/long runs to build this trend.")
+        else:
+            newest = aer.sort_values("date").tail(1)
+            multi_surf = aer["surface"].nunique() > 1
+            ef_legend = alt.Legend(orient="top", title=None) if multi_surf else None
+            raw = alt.Chart(aer).mark_point(size=45, opacity=0.35, filled=True).encode(
                 x=alt.X("date:T", title=None, axis=AXIS),
-                y=alt.Y(f"{field}:Q", title=title, scale=alt.Scale(zero=False), axis=AXIS),
-                tooltip=[alt.Tooltip("date:T"), alt.Tooltip(f"{field}:Q"), alt.Tooltip("avg_pace:N", title="pace")]))
-            st.altair_chart(alt.layer(*layers).properties(height=160).configure_view(strokeWidth=0),
-                            use_container_width=True)
-            st.caption(target_text)
-    _spark(f1, "cadence_spm", "cadence (spm)", 178, 180, "Target 178–180 spm (best: 183)")
-    _spark(f2, "vertical_osc_cm", "vert. osc (cm)", 7.0, 8.5, "Target < 8.5 cm (best: 7.5)")
-    _spark(f3, "gct_ms", "GCT (ms)", None, None, "Compare only at similar paces — GCT rises naturally when running slower")
+                y=alt.Y("EF:Q", title="m/min per bpm", scale=alt.Scale(zero=False), axis=AXIS),
+                color=alt.Color("surface:N", scale=SURF_SCALE, legend=ef_legend),
+                tooltip=[alt.Tooltip("date:T", title="Date"), alt.Tooltip("run_type:N", title="Type"),
+                         alt.Tooltip("surface:N"), alt.Tooltip("EF:Q", title="EF", format=".3f"),
+                         alt.Tooltip("avg_pace:N", title="pace"), alt.Tooltip("avg_hr:Q", title="HR"),
+                         alt.Tooltip("distance_km:Q", title="km", format=".1f")])
+            line = alt.Chart(aer).mark_line(strokeWidth=2.5, interpolate="monotone").encode(
+                x="date:T", y="EF_ma:Q",
+                color=alt.Color("surface:N", scale=SURF_SCALE, legend=None),
+                tooltip=[alt.Tooltip("date:T"), alt.Tooltip("EF_ma:Q", title=f"{ma_n}-run MA", format=".3f")])
+            ring = alt.Chart(newest).mark_point(size=180, filled=False, strokeWidth=2.5,
+                                                color=C_CRIT).encode(x="date:T", y="EF:Q")
+            tag = alt.Chart(newest).mark_text(dy=-18, fontSize=11, fontWeight=600, color=C_CRIT).encode(
+                x="date:T", y="EF:Q", text=alt.value("latest run"))
+            st.altair_chart((raw + line + ring + tag).properties(height=300)
+                            .configure_view(strokeWidth=0), use_container_width=True)
+            st.caption(f"Faint dots = individual runs · bold line = {ma_n}-run moving average · "
+                       "🔴 ring = your most recently logged run. **Up and to the right is fitness.** "
+                       "Lines never cross surfaces — treadmill and outdoor are separate series.")
 
-    # ---- shoes (feature 11)
-    st.subheader("Shoe mileage")
-    shoe_km = R.dropna(subset=["shoe"]).groupby("shoe")["distance_km"].sum()
-    scols = st.columns(len(plan.SHOES))
-    for scol, s in zip(scols, plan.SHOES):
-        km = shoe_km.get(s["model"], 0.0)
-        scol.metric(s["model"], f"{km:.0f} km", delta=s["role"], delta_color="off")
-    st.caption("Mileage counts from logged `shoe` values — historical rows mostly predate shoe logging; totals build going forward.")
+        # ---- pace trend vs target band ------------------------------------
+        st.subheader("Easy/long pace vs the 6:10–6:15 outdoor target")
+        pace_out = aer[aer["surface"] == "outdoor"]
+        if pace_out.empty:
+            st.info("No outdoor easy/long runs with pace + HR yet.")
+        else:
+            # descending domain puts faster paces at the top; padded to the data range
+            p_lo = min(365, float(pace_out["pace_adj"].min()) - 10)
+            p_hi = float(pace_out["pace_adj"].max()) + 10
+            PACE_Y = alt.Scale(domain=[p_hi, p_lo])
+            target = alt.Chart(pd.DataFrame({"lo": [370], "hi": [375]})).mark_rect(
+                color=C_TM, opacity=0.22).encode(y=alt.Y("lo:Q", scale=PACE_Y), y2="hi:Q")
+            p_raw = alt.Chart(pace_out).mark_point(size=50, opacity=0.4, filled=True, color=C_OUT).encode(
+                x=alt.X("date:T", title=None, axis=AXIS),
+                y=alt.Y("pace_adj:Q", title="pace (min/km)", scale=PACE_Y,
+                        axis=alt.Axis(gridColor=C_GRID, labelColor=C_MUTED, titleColor=C_MUTED,
+                                      labelExpr=PACE_LABEL, tickCount=7)),
+                size=alt.Size("distance_km:Q", legend=None, scale=alt.Scale(range=[40, 260])),
+                tooltip=[alt.Tooltip("date:T"), alt.Tooltip("avg_pace:N", title="raw pace"),
+                         alt.Tooltip("pace_adj:Q", title="adj pace (s/km)", format=".0f"),
+                         alt.Tooltip("avg_hr:Q", title="HR"),
+                         alt.Tooltip("feels_like_c:Q", title="feels °C"),
+                         alt.Tooltip("distance_km:Q", title="km", format=".1f")])
+            p_line = alt.Chart(pace_out).mark_line(strokeWidth=2.5, color=C_OUT,
+                                                   interpolate="monotone").encode(
+                x="date:T", y=alt.Y("pace_ma:Q", scale=PACE_Y))
+            p_ring = alt.Chart(pace_out.sort_values("date").tail(1)).mark_point(
+                size=180, filled=False, strokeWidth=2.5, color=C_CRIT).encode(
+                x="date:T", y=alt.Y("pace_adj:Q", scale=PACE_Y))
+            st.altair_chart((target + p_raw + p_line + p_ring).properties(height=280)
+                            .configure_view(strokeWidth=0), use_container_width=True)
+            st.caption("Green band = the plan's outdoor Z2 goal (6:10–6:15/km). Axis is flipped so "
+                       "**faster is higher** — the line should climb toward the band. Dot size = distance"
+                       + (" · heat-adjusted paces" if heat_on else
+                          " · turn on heat-adjust above to strip out Singapore's temperature penalty") + ".")
+
+        # ---- aerobic curve, small multiples by surface ---------------------
+        st.subheader("The aerobic curve — is it shifting left?")
+        sc = pool.dropna(subset=["pace_adj", "avg_hr"])
+        if sc.empty:
+            st.info("No runs with both pace and HR yet.")
+        else:
+            surfaces = [s for s in plan.SURFACES if not sc[sc["surface"] == s].empty]
+            pcols = st.columns(len(surfaces))
+            for pcol, surf in zip(pcols, surfaces):
+                d = sc[sc["surface"] == surf]
+                z2band = alt.Chart(pd.DataFrame({"lo": [plan.Z2[0]], "hi": [plan.Z2[1]]})).mark_rect(
+                    color=C_OUT, opacity=0.08).encode(
+                    y=alt.Y("lo:Q", scale=alt.Scale(domain=[125, 175])), y2="hi:Q")
+                pts = alt.Chart(d).mark_point(filled=True, opacity=0.9, stroke="#ffffff",
+                                              strokeWidth=1.5).encode(
+                    x=alt.X("pace_adj:Q", title="pace (min/km)",
+                            scale=alt.Scale(domain=[330, 530]),
+                            axis=alt.Axis(gridColor=C_GRID, labelColor=C_MUTED, titleColor=C_MUTED,
+                                          labelExpr=PACE_LABEL, tickCount=6)),
+                    y=alt.Y("avg_hr:Q", title="avg HR", scale=alt.Scale(domain=[125, 175]), axis=AXIS),
+                    color=alt.Color("date:T", title=None,
+                                    scale=alt.Scale(range=["#cde2fb", "#0d366b"]),
+                                    legend=alt.Legend(orient="bottom", direction="horizontal",
+                                                      gradientLength=140)),
+                    size=alt.Size("distance_km:Q", legend=None, scale=alt.Scale(range=[50, 320])),
+                    tooltip=[alt.Tooltip("date:T"), alt.Tooltip("run_type:N"),
+                             alt.Tooltip("avg_pace:N", title="pace"), alt.Tooltip("avg_hr:Q", title="HR"),
+                             alt.Tooltip("distance_km:Q", title="km", format=".1f"),
+                             alt.Tooltip("grade:N")])
+                with pcol:
+                    st.markdown(f"**{surf.title()}** — {len(d)} runs")
+                    st.altair_chart((z2band + pts).properties(height=260)
+                                    .configure_view(strokeWidth=0), use_container_width=True)
+            st.caption(f"Shaded = Zone 2 ({plan.Z2[0]}–{plan.Z2[1]} bpm). Each panel is one surface — "
+                       "**pale dots are older runs, dark dots are recent**. Improving fitness moves the "
+                       "dark dots left (faster) at the same height (same HR).")
+
+        st.divider()
+
+        # ---- weekly volume vs band + 10% flags ----------------------------
+        st.subheader("Weekly volume vs plan band")
+        wsum = R.groupby("week", as_index=False)["distance_km"].sum().rename(columns={"distance_km": "km"})
+        all_weeks = pd.date_range(wsum["week"].min(), plan.RACE_DATE, freq="W-MON").date
+        vol = pd.DataFrame({"week": all_weeks}).merge(wsum, on="week", how="left").fillna({"km": 0})
+        bands = [plan.weekly_band(w) for w in vol["week"]]
+        vol["lo"] = [b[0] if b else None for b in bands]
+        vol["hi"] = [b[1] if b else None for b in bands]
+        prev_km = vol["km"].shift(1)
+        vol["breach"] = (prev_km > 10) & (vol["km"] > prev_km * 1.10)
+        vol["ma4"] = vol["km"].rolling(4, min_periods=1).mean().where(vol["km"] > 0)
+
+        band_area = alt.Chart(vol.dropna(subset=["lo"])).mark_area(color=C_BAND, opacity=0.25).encode(
+            x=alt.X("week:T", title=None, axis=AXIS), y=alt.Y("lo:Q", title="km/week", axis=AXIS), y2="hi:Q")
+        gap_df = pd.DataFrame([{"s": str(a), "e": str(b), "label": lab} for a, b, lab in plan.GAPS])
+        gap_rects = alt.Chart(gap_df).mark_rect(color=C_MUTED, opacity=0.12).encode(
+            x="s:T", x2="e:T", tooltip=["label:N"])
+        gap_text = alt.Chart(gap_df).mark_text(dy=-95, angle=270, color=C_MUTED, fontSize=10).encode(
+            x="s:T", text="label:N")
+        vbars = alt.Chart(vol[vol["km"] > 0]).mark_bar(width=9, cornerRadiusTopLeft=3,
+                                                       cornerRadiusTopRight=3, color=C_OUT).encode(
+            x="week:T", y="km:Q",
+            tooltip=[alt.Tooltip("week:T", title="Week of"), alt.Tooltip("km:Q", format=".1f"),
+                     alt.Tooltip("ma4:Q", title="4-week avg", format=".1f"),
+                     alt.Tooltip("lo:Q", title="Band lo", format=".0f"),
+                     alt.Tooltip("hi:Q", title="Band hi", format=".0f")])
+        ma4_line = alt.Chart(vol.dropna(subset=["ma4"])).mark_line(
+            color="#0d366b", strokeWidth=2, interpolate="monotone").encode(x="week:T", y="ma4:Q")
+        flags = alt.Chart(vol[vol["breach"]]).mark_text(text="⚠", dy=-12, fontSize=15, color=C_CRIT).encode(
+            x="week:T", y="km:Q", tooltip=alt.value("More than +10% vs the previous week"))
+        now_rule = alt.Chart(pd.DataFrame({"d": [str(TODAY)]})).mark_rule(
+            color=C_CRIT, strokeWidth=1.5).encode(x="d:T")
+        st.altair_chart((band_area + gap_rects + gap_text + vbars + ma4_line + flags + now_rule)
+                        .properties(height=280).configure_view(strokeWidth=0), use_container_width=True)
+        st.caption("🟦 bars = km logged that week · dark line = 4-week rolling average (the trend that "
+                   "matters for adaptation) · shaded band = the phase's target range · ⚠ = 10%-rule "
+                   "breach · gray blocks = illness/holiday, real gaps rather than missing data.")
+
+        # ---- long-run ladder ----------------------------------------------
+        st.subheader("Long-run ladder — planned vs actual")
+        ladder = pd.DataFrame(plan.full_ladder())
+        ladder["date"] = pd.to_datetime(ladder["date"])
+        ladder["kind"] = ladder["type"].fillna("build") if "type" in ladder else "build"
+        actual_lr = R[R["run_type"].isin(["long", "race_hm"])].copy()
+        plan_line = alt.Chart(ladder).mark_line(color=C_MUTED, strokeWidth=1.5, strokeDash=[4, 3],
+                                                point=alt.OverlayMarkDef(color=C_MUTED, size=45)).encode(
+            x=alt.X("date:T", title=None, axis=AXIS), y=alt.Y("km:Q", title="km", axis=AXIS),
+            tooltip=[alt.Tooltip("date:T", title="Planned"), alt.Tooltip("km:Q"),
+                     alt.Tooltip("kind:N", title="type")])
+        act_line = alt.Chart(actual_lr).mark_line(color=C_OUT, strokeWidth=2.5).encode(
+            x="date:T", y="distance_km:Q")
+        act_pts = alt.Chart(actual_lr).mark_point(filled=True, size=110, color=C_OUT,
+                                                  stroke="#ffffff", strokeWidth=2).encode(
+            x="date:T", y="distance_km:Q",
+            tooltip=[alt.Tooltip("date:T"), alt.Tooltip("distance_km:Q", title="km", format=".1f"),
+                     alt.Tooltip("grade:N"), alt.Tooltip("avg_hr:Q", title="avg HR"),
+                     alt.Tooltip("feels_like_c:Q", title="feels °C"), alt.Tooltip("notes:N")])
+        chips = alt.Chart(actual_lr.dropna(subset=["grade"])).mark_text(
+            dy=-16, fontSize=10, fontWeight=600, color="#52514e").encode(
+            x="date:T", y="distance_km:Q", text="grade:N")
+        st.altair_chart((plan_line + act_line + act_pts + chips + now_rule).properties(height=290)
+                        .configure_view(strokeWidth=0), use_container_width=True)
+        st.caption("Dashed gray = the planned ladder including down weeks, peaking at 32 km on 14 Nov · "
+                   "🟦 solid = your actual long runs, labelled with the grade you gave each one.")
+
+        st.divider()
+
+        col3, col4 = st.columns(2)
+        with col3:
+            st.subheader("Run quality — grade GPA")
+            gp = R.dropna(subset=["grade_points"]).sort_values("date").copy()
+            gp["GPA_ma"] = gp["grade_points"].rolling(ma_n, min_periods=1).mean()
+            g_raw = alt.Chart(gp).mark_point(size=45, opacity=0.35, filled=True, color=C_OUT).encode(
+                x=alt.X("date:T", title=None, axis=AXIS),
+                y=alt.Y("grade_points:Q", title="GPA", scale=alt.Scale(domain=[1.8, 4.5]), axis=AXIS),
+                tooltip=[alt.Tooltip("date:T"), alt.Tooltip("grade:N"), alt.Tooltip("notes:N")])
+            g_line = alt.Chart(gp).mark_line(color=C_OUT, strokeWidth=2.5, interpolate="monotone").encode(
+                x="date:T", y="GPA_ma:Q",
+                tooltip=[alt.Tooltip("GPA_ma:Q", title=f"{ma_n}-run MA", format=".2f")])
+            st.altair_chart((g_raw + g_line).properties(height=230).configure_view(strokeWidth=0),
+                            use_container_width=True)
+            st.caption(f"A+ = 4.3 … C = 2.0 · faint dots = each run, line = {ma_n}-run average.")
+
+        with col4:
+            st.subheader("Cardiac drift — long runs")
+            drift = R[R["run_type"] == "long"].dropna(subset=["hr_first_half", "hr_second_half"]).copy()
+            if drift.empty:
+                st.info("Log **HR 1st half / 2nd half** on long runs (the fields are on the Log runs "
+                        "form) and drift tracking appears here. Target is < 15 bpm — your April HM "
+                        "showed ~22 bpm, so this is a key readiness metric to move.")
+            else:
+                drift["drift"] = drift["hr_second_half"] - drift["hr_first_half"]
+                drift["status"] = drift["drift"].map(lambda d: "✅ good" if d < 15 else "🔴 high")
+                st.dataframe(drift[["date", "distance_km", "hr_first_half", "hr_second_half",
+                                    "drift", "status"]], hide_index=True, use_container_width=True)
+                st.caption("Target < 15 bpm between halves at steady effort.")
+
+        # ---- form panel ----------------------------------------------------
+        st.subheader("Running form vs targets")
+        f1, f2, f3 = st.columns(3)
+
+        def _spark(col, field, title, lo=None, hi=None, target_text=""):
+            d = R.dropna(subset=[field]).sort_values("date").copy()
+            with col:
+                if d.empty:
+                    st.info(f"No {title} data yet.")
+                    return
+                d["ma"] = d[field].rolling(ma_n, min_periods=1).mean()
+                layers = []
+                if lo is not None:
+                    layers.append(alt.Chart(pd.DataFrame({"lo": [lo], "hi": [hi]})).mark_rect(
+                        color=C_TM, opacity=0.12).encode(
+                        y=alt.Y("lo:Q", scale=alt.Scale(zero=False)), y2="hi:Q"))
+                layers.append(alt.Chart(d).mark_point(size=40, opacity=0.35, filled=True,
+                                                      color=C_OUT).encode(
+                    x=alt.X("date:T", title=None, axis=AXIS),
+                    y=alt.Y(f"{field}:Q", title=title, scale=alt.Scale(zero=False), axis=AXIS),
+                    tooltip=[alt.Tooltip("date:T"), alt.Tooltip(f"{field}:Q"),
+                             alt.Tooltip("avg_pace:N", title="pace")]))
+                layers.append(alt.Chart(d).mark_line(color=C_OUT, strokeWidth=2.5,
+                                                     interpolate="monotone").encode(
+                    x="date:T", y=alt.Y("ma:Q", scale=alt.Scale(zero=False))))
+                st.altair_chart(alt.layer(*layers).properties(height=180)
+                                .configure_view(strokeWidth=0), use_container_width=True)
+                st.caption(target_text)
+
+        _spark(f1, "cadence_spm", "cadence (spm)", 178, 180, "Target 178–180 spm (your best: 183)")
+        _spark(f2, "vertical_osc_cm", "vert. osc (cm)", 7.0, 8.5, "Target < 8.5 cm (your best: 7.5)")
+        _spark(f3, "gct_ms", "GCT (ms)", None, None,
+               "Compare only at similar paces — GCT naturally rises when you run slower")
+
+        # ---- shoes ---------------------------------------------------------
+        st.subheader("Shoe mileage")
+        shoe_km = R.dropna(subset=["shoe"]).groupby("shoe")["distance_km"].sum()
+        scols = st.columns(len(plan.SHOES))
+        for scol, sh in zip(scols, plan.SHOES):
+            scol.metric(sh["model"], f"{shoe_km.get(sh['model'], 0.0):.0f} km",
+                        delta=sh["role"], delta_color="off")
+        st.caption("Counts only runs where you logged a shoe — most historical rows predate shoe "
+                   "logging, so totals build from here.")
 
 # ---------------------------------------------------------------- training plan
 with tab_plan:
