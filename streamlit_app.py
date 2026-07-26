@@ -120,13 +120,30 @@ with st.sidebar:
     if plan.ZONES_PROVISIONAL:
         st.warning("HR zones are PROVISIONAL — confirm via the 30-min LTHR field test (Phase 2, week 1).")
     st.divider()
-    st.caption(f"Run log: {st.session_state['runs_source']}")
+    SYNCED = st.session_state["runs_source"].startswith("GitHub")
+    if SYNCED:
+        st.success(f"Run log: {st.session_state['runs_source']}")
+    else:
+        st.error("⚠️ Run log NOT saved — new runs are lost on restart")
     st.caption("Screenshot parsing: " + ("✅ enabled" if run_parser.available() else "❌ add ANTHROPIC_API_KEY"))
     if st.button("↻ Reload data"):
         _df, _src = storage.load_runs()
         st.session_state["runs"] = _df
         st.session_state["runs_source"] = _src
         st.rerun()
+
+if not SYNCED:
+    st.error(
+        "### ⚠️ Runs you log here are **not being saved**\n"
+        "This app has no `GITHUB_TOKEN` secret, so the run log lives in temporary storage that is "
+        "wiped every time the app restarts or redeploys — anything logged since the last restart is "
+        "already gone.\n\n"
+        "**Fix it:** *Manage app → Settings → Secrets*, add a fine-grained GitHub token with "
+        "**Contents: Read and write** on this repo:\n"
+        "```toml\nGITHUB_TOKEN = \"github_pat_...\"\n"
+        "GITHUB_REPO = \"dnhoswork-ui/Marathon-Training\"\nGITHUB_BRANCH = \"main\"\n```\n"
+        "**Until then:** press **⬇ Download runs.csv** on the Log runs tab after every session, and "
+        "use **Restore from backup** on the same tab to load it back.")
 
 tab_over, tab_log, tab_prog, tab_plan, tab_race = st.tabs(
     ["📍 Overview", "➕ Log runs", "📈 Progress", "🗓 Training plan", "🏁 Race day"])
@@ -270,7 +287,12 @@ with tab_log:
                 st.session_state["runs"] = storage.load_runs()[0] if ok else new
                 st.session_state.pop("prefill", None)
                 (st.success if ok else st.error)(msg)
+                if ok and not SYNCED:
+                    st.session_state["nag_backup"] = True
                 st.rerun()
+    if st.session_state.pop("nag_backup", False):
+        st.warning("Run saved — but GitHub sync is off, so **download the CSV below now** or this run "
+                   "disappears when the app restarts.")
 
     st.divider()
     st.subheader("Run log")
@@ -291,7 +313,33 @@ with tab_log:
         st.session_state["runs"] = storage.load_runs()[0] if ok else edited
         (st.success if ok else st.error)(msg)
         st.rerun()
-    c2.download_button("⬇ Download runs.csv", st.session_state["runs"].to_csv(index=False), "runs.csv", "text/csv")
+    c2.download_button("⬇ Download runs.csv", st.session_state["runs"].to_csv(index=False),
+                       "runs.csv", "text/csv",
+                       type="secondary" if SYNCED else "primary",
+                       help="Your backup. Essential while GitHub sync is off — the app's own copy is temporary.")
+
+    with st.expander("♻️ Restore from a backup CSV"):
+        st.caption("Upload a `runs.csv` you downloaded earlier. Runs are **merged** with what's already "
+                   "here — identical rows (same date, type and distance) are not duplicated.")
+        up = st.file_uploader("runs.csv backup", type=["csv"], label_visibility="collapsed")
+        if up is not None:
+            try:
+                incoming = pd.read_csv(up)
+                incoming["date"] = pd.to_datetime(incoming["date"], errors="coerce").dt.date
+                st.write(f"Backup contains **{len(incoming)} rows**, "
+                         f"{incoming['date'].min()} → {incoming['date'].max()}.")
+                if st.button("Merge into run log", type="primary"):
+                    merged = pd.concat([st.session_state["runs"], incoming], ignore_index=True)
+                    before = len(merged)
+                    merged = merged.drop_duplicates(subset=["date", "run_type", "distance_km"],
+                                                    keep="last")
+                    ok, msg = storage.save_runs(merged)
+                    st.session_state["runs"] = storage.load_runs()[0] if ok else merged
+                    st.success(f"Merged — {len(merged)} runs total "
+                               f"({before - len(merged)} duplicates skipped). {msg}")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Couldn't read that CSV: {e}")
 
 # ---------------------------------------------------------------- progress
 with tab_prog:
