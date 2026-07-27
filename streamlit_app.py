@@ -245,7 +245,10 @@ with tab_log:
         except ValueError:
             pre_date = TODAY
         with st.form("add_run", clear_on_submit=True):
-            f_date = st.date_input("Date", value=pre_date)
+            r0 = st.columns([2, 1])
+            f_date = r0[0].date_input("Date", value=pre_date)
+            f_start = r0[1].text_input("Start time", placeholder="06:30",
+                                       help="Matters in Singapore — heat arrives ~07:15–07:30")
             r1 = st.columns(2)
             f_type = r1[0].selectbox("Type", plan.RUN_TYPES)
             f_surface = r1[1].selectbox("Surface", plan.SURFACES)
@@ -278,7 +281,7 @@ with tab_log:
                 pace_s = int(mins * 60 / f_dist) if (mins and f_dist > 0) else None
                 p = plan.phase_of(f_date)
                 row = {
-                    "date": f_date, "date_precision": "exact",
+                    "date": f_date, "start_time": f_start.strip() or None, "date_precision": "exact",
                     "phase": p["id"] if p else "", "run_type": f_type, "surface": f_surface,
                     "distance_km": round(f_dist, 2) or None, "duration": f_dur.strip() or None,
                     "avg_pace": fmt_pace(pace_s) if pace_s else None, "pace_sec_per_km": pace_s,

@@ -21,7 +21,7 @@ import streamlit as st
 RUNS_PATH = "data/runs.csv"
 LOCAL_RUNS = os.path.join(os.path.dirname(os.path.abspath(__file__)), RUNS_PATH)
 COLUMNS = [
-    "date", "date_precision", "phase", "run_type", "surface", "distance_km", "duration",
+    "date", "start_time", "date_precision", "phase", "run_type", "surface", "distance_km", "duration",
     "avg_pace", "pace_sec_per_km", "avg_hr", "max_hr", "cadence_spm", "stride_length_m",
     "vertical_osc_cm", "gct_ms", "avg_power_w", "feel", "perceived_effort",
     "grade", "grade_points", "shoe", "feels_like_c", "hr_first_half", "hr_second_half", "notes",
