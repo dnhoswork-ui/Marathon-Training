@@ -1,0 +1,79 @@
+{
+  "_instructions": "Single run record to append to past_runs.csv. Field names below are canonical; map them onto the existing CSV column names rather than adding new columns where an equivalent already exists. Fields with null are genuine data gaps, not zeros.",
+
+  "date": "2026-07-30",
+  "session_type": "lthr_test",
+  "surface": "outdoor",
+  "shoes": null,
+
+  "distance_km": 5.51,
+  "duration": "30:10",
+  "duration_sec": 1810,
+  "moving_time": "29:34",
+  "moving_time_sec": 1774,
+  "avg_pace": "5:29",
+  "pace_sec_per_km": 329,
+  "avg_moving_pace": "5:22",
+  "moving_pace_sec_per_km": 322,
+  "best_pace": "4:50",
+  "grade_adj_pace": "5:28",
+
+  "avg_hr": 162,
+  "max_hr": 179,
+
+  "avg_cadence_spm": 163,
+  "max_cadence_spm": 174,
+  "avg_stride_length_m": 1.12,
+  "avg_vertical_ratio_pct": 8.6,
+  "avg_vertical_oscillation_cm": 9.6,
+  "avg_gct_ms": 263,
+
+  "avg_power_w": 287,
+  "max_power_w": 343,
+
+  "te_aerobic": 3.8,
+  "te_anaerobic": 0.0,
+  "exercise_load": 151,
+  "primary_benefit": "Threshold (High Aerobic)",
+
+  "calories_total": 348,
+  "calories_active": 308,
+  "sweat_loss_ml": 502,
+  "ascent_m": 5,
+  "descent_m": 6,
+  "body_battery_net": -4,
+
+  "rpe": 5,
+  "feel": "very_weak",
+
+  "grade": null,
+  "grade_points": null,
+  "_grade_note": "Deliberately ungraded. A field test is a measurement, not a session to score against pace/HR targets — grading it would pollute the grade trend.",
+
+  "include_in_ef_trend": false,
+  "exclude_reason": "Activity started cold with no warm-up (HR 80 bpm at t=0). Whole-run EF is distorted by the ramp and is not comparable to steady Z2 sessions.",
+
+  "test_result": {
+    "protocol": "30-min field test, average HR of final 20 min",
+    "lap_structure": "Manual lap press at 10:05 and 30:06; laps 3-6 together form the measurement window",
+    "window_laps": [3, 4, 5, 6],
+    "window_distance_km": 3.83,
+    "window_duration": "20:01",
+    "window_pace": "5:14",
+    "window_pace_sec_per_km": 314,
+    "lthr_detected": 176,
+    "lthr_source": "Garmin auto-detect"
+  },
+
+  "laps": [
+    { "lap": 1, "time": "6:21.6", "distance_km": 1.00, "pace": "6:22" },
+    { "lap": 2, "time": "3:43.5", "distance_km": 0.67, "pace": "5:33" },
+    { "lap": 3, "time": "5:05.1", "distance_km": 1.00, "pace": "5:05" },
+    { "lap": 4, "time": "5:07.3", "distance_km": 1.00, "pace": "5:07" },
+    { "lap": 5, "time": "5:22.1", "distance_km": 1.00, "pace": "5:22" },
+    { "lap": 6, "time": "4:26.5", "distance_km": 0.83, "pace": "5:21" },
+    { "lap": 7, "time": "0:04.4", "distance_km": 0.01, "pace": "7:42" }
+  ],
+
+  "notes": "Pace faded 5:05 -> 5:22 across the window while HR climbed to 179 — effort sat at or just above threshold, which is what a valid test should look like. Logged Feel as 'Very Weak' at only RPE 5/10; flag if this recurs, since it may indicate the HR reading was elevated by fatigue or illness rather than by effort."
+}

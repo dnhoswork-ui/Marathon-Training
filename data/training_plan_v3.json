@@ -10,7 +10,8 @@
       "LTHR 30-min field test scheduled Phase 2 week 1 before any tempo work",
       "Strength 2x/week starts NOW (was planned Month 2, not yet started)",
       "Tune-up HM moved to early Oct (Phase 3 wk 2) as 3:40/3:35 stretch decision point",
-      "Long-run ladder rebuilt week-by-week with down weeks, from actual 18km base"
+      "Long-run ladder rebuilt week-by-week with down weeks, from actual 18km base",
+      "LTHR field test completed 2026-07-30: LTHR 176, threshold pace 5:14/km. Zones rebased, tempo prescription revised, sub-3:35 stretch retired."
     ]
   },
   "today": "2026-07-18",
@@ -19,7 +20,8 @@
   "current_phase_id": "phase2",
   "targets": {
     "primary": "3:50 (5:27/km)",
-    "stretch": "3:35 (5:06/km)"
+    "signal": "3:40 (5:13/km)",
+    "retired": "3:35 - retired 2026-07-30 (field test put marathon-equivalent at 3:55-4:05)"
   },
   "phases": [
     {
@@ -53,11 +55,50 @@
         20,
         28
       ],
-      "week_1_special": "30-min LTHR field test (10 min warm-up, 30 min max sustainable effort; avg HR of final 20 min = LTHR). Replaces tempo. Lock zones before tempo begins.",
+      "week_1_special": {
+        "description": "30-min LTHR field test (10 min warm-up, 30 min max sustainable effort; avg HR of final 20 min = LTHR). Replaces tempo. Lock zones before tempo begins.",
+        "status": "COMPLETE",
+        "completed_on": "2026-07-30",
+        "result": "LTHR 176, threshold pace 5:14/km"
+      },
       "key_sessions": {
-        "tempo": "Weekly from week 2. 20 -> 35 min continuous. Outdoor 5:30 -> 5:15/km (treadmill equivalent 5:20 -> 5:10). Shoe: Feidian 6C.",
-        "long": "Saturday, Z2 controlled progression. Gels on every run >= 16km. Shoe: Nimbus 25.",
-        "easy": "Monday, Z2 8-10km outdoor, HR 138-150."
+        "tempo": {
+          "description": "Weekly from week 2, 20 -> 35 min continuous. Shoe: Feidian 6C.",
+          "duration_min": [
+            20,
+            35
+          ],
+          "pace_outdoor": {
+            "start": "5:25",
+            "end": "5:10"
+          },
+          "pace_treadmill": {
+            "start": "5:15",
+            "end": "5:00"
+          },
+          "target_hr_bpm": [
+            167,
+            172
+          ],
+          "shoe": "Feidian 6C",
+          "basis": "LTHR 176 field test 2026-07-30",
+          "note": "Sits in the lower two-thirds of Z4. Tempo should be sustainable, not a repeat of the test.",
+          "supersedes": "5:30 -> 5:15/km (pre-test estimate, pitched soft vs measured 5:14 threshold)"
+        },
+        "long": {
+          "description": "Saturday, Z2 controlled progression. Gels on every run >= 16 km. Shoe: Nimbus 25.",
+          "target_hr_bpm": [
+            141,
+            157
+          ]
+        },
+        "easy": {
+          "description": "Monday, Z2 8-10 km outdoor.",
+          "target_hr_bpm": [
+            141,
+            153
+          ]
+        }
       },
       "weekly_template": {
         "Mon": "Easy Z2 8-10km outdoor",
@@ -114,7 +155,7 @@
       "exit_criteria": [
         "28km long run completed",
         "Tempo 5:15/km held 30 min",
-        "HR at 6:10-6:15/km outdoor <= 150",
+        "HR at 6:10-6:15/km outdoor <= 153 (Z2 upper-easy under LTHR 176)",
         "45-48 km/wk absorbed without RHR spike"
       ]
     },
@@ -143,7 +184,8 @@
       "tune_up": {
         "window": "2026-10-03/04",
         "session": "Half marathon, full race effort",
-        "decision_rule": "sub-1:52 hold 3:50 | sub-1:48 open 3:40 | sub-1:46 chase 3:35 stretch"
+        "decision_rule": "sub-1:52 hold 3:50 | sub-1:48 open 3:40 | 3:35 retired 2026-07-30 after the LTHR field test",
+        "decision_rule_superseded": "sub-1:52 hold 3:50 | sub-1:48 open 3:40 | sub-1:46 chase 3:35 stretch"
       },
       "long_run_ladder": [
         {

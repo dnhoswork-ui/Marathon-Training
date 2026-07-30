@@ -1,36 +1,37 @@
-date,start_time,date_precision,phase,run_type,surface,distance_km,duration,avg_pace,pace_sec_per_km,avg_hr,max_hr,cadence_spm,stride_length_m,vertical_osc_cm,gct_ms,avg_power_w,feel,perceived_effort,grade,grade_points,shoe,feels_like_c,hr_first_half,hr_second_half,notes
-2026-03-25,,approx,hm_block,long,outdoor,21.52,2:07:49,5:56,356,,,,,,,,,,,,,,,,"Longest pre-race long run (date approximate, late Mar)"
-2026-03-30,,exact,hm_block,tempo,outdoor,,,6:31,391,154.0,,,,,,,,,B+,3.3,,,,,Fasted + slightly unwell - HR inflated vs race-day equivalent
-2026-04-04,,exact,hm_block,shakeout,outdoor,,,6:40,400,138.0,,,,,233.0,,,,A,4.0,,,,,Race-eve shakeout
-2026-04-05,,exact,race,race_hm,outdoor,21.1,1:56:05,5:29,329,166.0,,,,8.7,,,,,,,Li-Ning Feidian 5 Challenger,,,,HM race - PR (prev 2:04:43). Max HR 179 observed. ~22bpm cardiac drift
-2026-04-09,,exact,base_pre_illness,easy,outdoor,6.78,,7:15,435,140.0,,174.0,,8.6,,,,,A-,3.7,,,,,M1 Wk1 post-race recovery
-2026-04-11,,exact,base_pre_illness,easy,outdoor,8.65,1:01:26,7:05,425,141.0,,174.0,,8.2,,,,,A-,3.7,,,,,74% of time in Z2
-2026-04-12,,exact,base_pre_illness,easy,outdoor,5.37,,6:58,418,136.0,,176.0,,8.4,,,,,A,4.0,,,,,
-2026-04-16,,exact,base_pre_illness,easy,outdoor,6.81,49:30,7:15,435,141.0,,178.0,,8.2,,,,,B+,3.3,,,,,Went out fast then faded; cadence 178
-2026-04-23,,exact,base_pre_illness,easy,outdoor,6.26,,7:27,447,140.0,,175.0,,8.2,,,,,B,3.0,,,,,
-2026-04-24,,exact,base_pre_illness,easy,outdoor,6.86,,7:56,476,140.0,,169.0,,8.2,,,,,C+,2.3,,,,,Last run before ~3-week illness gap (late Apr - mid May)
-2026-05-14,,exact,phase1_rebuild,easy,outdoor,6.14,,8:29,509,150.0,,167.0,,8.3,,,,,C+,2.3,,,,,First run back post-illness (run/walk)
-2026-05-15,,exact,phase1_rebuild,easy,outdoor,5.63,,8:20,500,142.0,,164.0,,7.7,,,,,B-,2.7,,,,,
-2026-05-17,,exact,phase1_rebuild,easy,outdoor,5.63,,7:43,463,147.0,,164.0,,,,,,,B-,2.7,,,,,
-2026-05-21,,exact,phase1_rebuild,easy,treadmill,8.9,1:00:00,6:45,405,142.0,,,,,,,,,B+,3.3,,,,,First treadmill session of rebuild (~60 min)
-2026-06-01,,exact,phase1_rebuild,easy,treadmill,12.0,1:19:48,6:39,399,138.0,,,,,,,,,A,4.0,,,,,Longest run PR at the time; effort 3/10
-2026-06-03,,exact,phase1_rebuild,easy,treadmill,8.54,,7:04,424,143.0,,,,,,,,,B+,3.3,,,,,
-2026-06-11,,exact,phase1_rebuild,easy,treadmill,9.0,,6:42,402,137.0,,,,,,,,,A,4.0,,,,,
-2026-06-12,,exact,phase1_rebuild,long,treadmill,15.0,,6:38,398,137.0,,,,,,,,,A+,4.3,,,,,15km PR
-2026-06-13,,exact,phase1_rebuild,easy,outdoor,7.22,,7:13,433,146.0,,,,,,,,,B+,3.3,,,,,Day after 15km PR
-2026-06-14,,exact,phase1_rebuild,easy,treadmill,6.1,35:40,5:51,351,141.0,,183.0,,7.5,255.0,,,,A,4.0,,,,,"Cadence PB 183, VO PB 7.5cm; coach flagged pace above prescription"
-2026-06-25,,exact,phase1_rebuild,easy,treadmill,6.02,37:10,6:10,370,142.0,,176.0,,7.9,258.0,,,,A,4.0,,,,,Return after 1.5wk holiday (20k steps/day); power 241W
-2026-06-26,,exact,phase1_rebuild,easy,treadmill,10.13,1:01:24,6:04,364,148.0,,178.0,,7.9,256.0,,,,A-,3.7,,,,,
-2026-06-27,,exact,phase1_rebuild,easy,treadmill,10.01,,5:58,358,144.0,,179.0,,,,,,,A+,4.3,,,,,Stride length PB 0.94m; outdoor skipped for heat
-2026-07-02,,exact,phase1_rebuild,easy,outdoor,4.97,,6:46,406,152.0,,,,,,,,,C+,2.3,,,,,Cut short - went out too hard. Start of outdoor-priority block
-2026-07-04,,exact,phase1_rebuild,easy,outdoor,7.62,,7:07,427,150.0,,170.0,,,273.0,,,,B,3.0,,37.0,,,Feels-like 37C; controlled by HR throughout
-2026-07-06,,exact,phase1_rebuild,easy,outdoor,10.36,,6:40,400,144.0,,,,,,,,,A,4.0,,31.0,,,31C morning
-2026-07-09,,exact,phase1_rebuild,easy,outdoor,6.84,,7:26,446,148.0,,,,,,,,,B-,2.7,,36.0,,,Feels-like 36C
-2026-07-11,,exact,phase1_rebuild,long,outdoor,18.01,1:52:16,6:14,374,156.0,,175.0,,8.1,262.0,,,,B+,3.3,Asics Nimbus 25,36.0,,,18km PB. 2-3 paused water breaks (active-time-only data). Late heat from ~7:30am. Graded on controlled-progression standard
-2026-07-16,07:23,exact,phase1_rebuild,easy,outdoor,10.00,1:10:46,7:04,425,156,,169,,7.9,275,,Weak,4/10,,,,34.0,,,"[Weak, RPE 4/10] Feels like 34C. Garmin classified Tempo (High Aerobic), Aerobic TE 3.6. GCT highest recorded at the time - fatigue signature. Not quite in form per athlete; attributed to accumulated fatigue from big prior week (18km long run) plus heat, not fitness decline."
-2026-07-17,07:21,exact,phase1_rebuild,easy,outdoor,7.23,50:05,6:56,416,147,,172,,8,273,,Normal,4/10,,,,,,,"[Normal, RPE 4/10] Recovery run following 16 Jul fatigue-flagged session. Garmin classified Base (Low Aerobic), Aerobic TE 3.1. Confirmed fatigue theory - faster pace and lower HR than 2 days prior after rest."
-2026-07-18,15:18,exact,phase1_rebuild,easy,treadmill,10.08,56:06,5:34,334,150,,180,1.02,8,243,269,Strong,3/10,,,,,,,"[Strong, RPE 3/10] Fastest sustained treadmill pace recorded to date. Personal bests in GCT (243ms) and stride length (1.02m). Garmin classified Base (Low Aerobic), Aerobic TE 3.6, Exercise Load 128. Faster than typical Phase 1 base effort - closer to tempo-adjacent."
-2026-07-19,06:24,exact,phase1_rebuild,easy,outdoor,8.61,57:49,6:43,403,152,,,,,,,Weak,5/10,,,,,,,"[Weak, RPE 5/10] Last day of 4-day consecutive training block (~35-36km for the week, no rest day). Accumulated fatigue confirmed. Garmin classified Base (Low Aerobic). Coach flagged need for at least 1 rest day per week going forward."
-2026-07-23,07:36,exact,phase2,easy,outdoor,10.35,1:09:42,6:44,404,151,,170,,8.2,273,,Strong,3/10,,,,,,,"[Strong, RPE 3/10] Recovery confirmed following rest day after 22 Jul fatigue. Nearly identical pace/HR to 22 Jul but completely different subjective feel (Strong vs Weak, 3/10 vs 5/10 effort) - proof previous dip was fatigue not fitness decline. Garmin classified Base (Low Aerobic), Aerobic TE 3.7. Goblet squats + lunges done same day."
-2026-07-24,07:44,exact,phase2,easy,outdoor,9.35,1:01:53,6:37,397,150,163,170,,8.4,274,234,Strong,3/10,,,,,,,"[Strong, RPE 3/10] Best clean Zone 2 data point in recent stretch - broke plateau after two flat readings (22 Jul, 24 Jul). Gap to target pace (6:10-6:15/km) narrowed to +22-27 sec, best yet. Garmin classified Base (Low Aerobic), Aerobic TE 3.6."
-2026-07-26,06:26,exact,phase2,long,outdoor,17.15,1:52:43,6:34,394,153,175,171,,8,,233,Strong,3/10,,,,,,,"[Strong, RPE 3/10] Best distance-pace-HR combination long run to date. Recovery HR 31 bpm (strong fitness signal). Weather good. Garmin classified Tempo (High Aerobic), Aerobic TE 4.4, Exercise Load 196. Run/walk strategy used - walk break for water approximately every 3km, timer kept running (continuous, not paused) unlike 11 Jul run. HR stayed controlled at Zone 2/3 boundary rather than clear Zone 3 overshoot seen on 11 Jul."
+date,start_time,date_precision,phase,run_type,surface,distance_km,duration,avg_pace,pace_sec_per_km,avg_hr,max_hr,cadence_spm,stride_length_m,vertical_osc_cm,gct_ms,avg_power_w,feel,perceived_effort,grade,grade_points,shoe,feels_like_c,hr_first_half,hr_second_half,include_in_ef_trend,notes
+2026-03-25,,approx,hm_block,long,outdoor,21.52,2:07:49,5:56,356,,,,,,,,,,,,,,,,true,"Longest pre-race long run (date approximate, late Mar)"
+2026-03-30,,exact,hm_block,tempo,outdoor,,,6:31,391,154.0,,,,,,,,,B+,8,,,,,true,Fasted + slightly unwell - HR inflated vs race-day equivalent
+2026-04-04,,exact,hm_block,shakeout,outdoor,,,6:40,400,138.0,,,,,233.0,,,,A,9,,,,,true,Race-eve shakeout
+2026-04-05,,exact,race,race_hm,outdoor,21.1,1:56:05,5:29,329,166.0,,,,8.7,,,,,,,Li-Ning Feidian 5 Challenger,,,,true,HM race - PR (prev 2:04:43). Max HR 179 observed. ~22bpm cardiac drift
+2026-04-09,,exact,base_pre_illness,easy,outdoor,6.78,,7:15,435,140.0,,174.0,,8.6,,,,,A-,8.5,,,,,true,M1 Wk1 post-race recovery
+2026-04-11,,exact,base_pre_illness,easy,outdoor,8.65,1:01:26,7:05,425,141.0,,174.0,,8.2,,,,,A-,8.5,,,,,true,74% of time in Z2
+2026-04-12,,exact,base_pre_illness,easy,outdoor,5.37,,6:58,418,136.0,,176.0,,8.4,,,,,A,9,,,,,true,
+2026-04-16,,exact,base_pre_illness,easy,outdoor,6.81,49:30,7:15,435,141.0,,178.0,,8.2,,,,,B+,8,,,,,true,Went out fast then faded; cadence 178
+2026-04-23,,exact,base_pre_illness,easy,outdoor,6.26,,7:27,447,140.0,,175.0,,8.2,,,,,B,7,,,,,true,
+2026-04-24,,exact,base_pre_illness,easy,outdoor,6.86,,7:56,476,140.0,,169.0,,8.2,,,,,C+,6,,,,,true,Last run before ~3-week illness gap (late Apr - mid May)
+2026-05-14,,exact,phase1_rebuild,easy,outdoor,6.14,,8:29,509,150.0,,167.0,,8.3,,,,,C+,6,,,,,true,First run back post-illness (run/walk)
+2026-05-15,,exact,phase1_rebuild,easy,outdoor,5.63,,8:20,500,142.0,,164.0,,7.7,,,,,B-,6.5,,,,,true,
+2026-05-17,,exact,phase1_rebuild,easy,outdoor,5.63,,7:43,463,147.0,,164.0,,,,,,,B-,6.5,,,,,true,
+2026-05-21,,exact,phase1_rebuild,easy,treadmill,8.9,1:00:00,6:45,405,142.0,,,,,,,,,B+,8,,,,,true,First treadmill session of rebuild (~60 min)
+2026-06-01,,exact,phase1_rebuild,easy,treadmill,12.0,1:19:48,6:39,399,138.0,,,,,,,,,A,9,,,,,true,Longest run PR at the time; effort 3/10
+2026-06-03,,exact,phase1_rebuild,easy,treadmill,8.54,,7:04,424,143.0,,,,,,,,,B+,8,,,,,true,
+2026-06-11,,exact,phase1_rebuild,easy,treadmill,9.0,,6:42,402,137.0,,,,,,,,,A,9,,,,,true,
+2026-06-12,,exact,phase1_rebuild,long,treadmill,15.0,,6:38,398,137.0,,,,,,,,,A+,10,,,,,true,15km PR
+2026-06-13,,exact,phase1_rebuild,easy,outdoor,7.22,,7:13,433,146.0,,,,,,,,,B+,8,,,,,true,Day after 15km PR
+2026-06-14,,exact,phase1_rebuild,easy,treadmill,6.1,35:40,5:51,351,141.0,,183.0,,7.5,255.0,,,,A,9,,,,,true,"Cadence PB 183, VO PB 7.5cm; coach flagged pace above prescription"
+2026-06-25,,exact,phase1_rebuild,easy,treadmill,6.02,37:10,6:10,370,142.0,,176.0,,7.9,258.0,,,,A,9,,,,,true,Return after 1.5wk holiday (20k steps/day); power 241W
+2026-06-26,,exact,phase1_rebuild,easy,treadmill,10.13,1:01:24,6:04,364,148.0,,178.0,,7.9,256.0,,,,A-,8.5,,,,,true,
+2026-06-27,,exact,phase1_rebuild,easy,treadmill,10.01,,5:58,358,144.0,,179.0,,,,,,,A+,10,,,,,true,Stride length PB 0.94m; outdoor skipped for heat
+2026-07-02,,exact,phase1_rebuild,easy,outdoor,4.97,,6:46,406,152.0,,,,,,,,,C+,6,,,,,true,Cut short - went out too hard. Start of outdoor-priority block
+2026-07-04,,exact,phase1_rebuild,easy,outdoor,7.62,,7:07,427,150.0,,170.0,,,273.0,,,,B,7,,37.0,,,true,Feels-like 37C; controlled by HR throughout
+2026-07-06,,exact,phase1_rebuild,easy,outdoor,10.36,,6:40,400,144.0,,,,,,,,,A,9,,31.0,,,true,31C morning
+2026-07-09,,exact,phase1_rebuild,easy,outdoor,6.84,,7:26,446,148.0,,,,,,,,,B-,6.5,,36.0,,,true,Feels-like 36C
+2026-07-11,,exact,phase1_rebuild,long,outdoor,18.01,1:52:16,6:14,374,156.0,,175.0,,8.1,262.0,,,,B+,8,Asics Nimbus 25,36.0,,,true,18km PB. 2-3 paused water breaks (active-time-only data). Late heat from ~7:30am. Graded on controlled-progression standard
+2026-07-16,07:23,exact,phase1_rebuild,easy,outdoor,10.00,1:10:46,7:04,425,156,,169,,7.9,275,,Weak,4/10,,,,34.0,,,true,"[Weak, RPE 4/10] Feels like 34C. Garmin classified Tempo (High Aerobic), Aerobic TE 3.6. GCT highest recorded at the time - fatigue signature. Not quite in form per athlete; attributed to accumulated fatigue from big prior week (18km long run) plus heat, not fitness decline."
+2026-07-17,07:21,exact,phase1_rebuild,easy,outdoor,7.23,50:05,6:56,416,147,,172,,8,273,,Normal,4/10,,,,,,,true,"[Normal, RPE 4/10] Recovery run following 16 Jul fatigue-flagged session. Garmin classified Base (Low Aerobic), Aerobic TE 3.1. Confirmed fatigue theory - faster pace and lower HR than 2 days prior after rest."
+2026-07-18,15:18,exact,phase1_rebuild,easy,treadmill,10.08,56:06,5:34,334,150,,180,1.02,8,243,269,Strong,3/10,,,,,,,true,"[Strong, RPE 3/10] Fastest sustained treadmill pace recorded to date. Personal bests in GCT (243ms) and stride length (1.02m). Garmin classified Base (Low Aerobic), Aerobic TE 3.6, Exercise Load 128. Faster than typical Phase 1 base effort - closer to tempo-adjacent."
+2026-07-19,06:24,exact,phase1_rebuild,easy,outdoor,8.61,57:49,6:43,403,152,,,,,,,Weak,5/10,,,,,,,true,"[Weak, RPE 5/10] Last day of 4-day consecutive training block (~35-36km for the week, no rest day). Accumulated fatigue confirmed. Garmin classified Base (Low Aerobic). Coach flagged need for at least 1 rest day per week going forward."
+2026-07-23,07:36,exact,phase2,easy,outdoor,10.35,1:09:42,6:44,404,151,,170,,8.2,273,,Strong,3/10,,,,,,,true,"[Strong, RPE 3/10] Recovery confirmed following rest day after 22 Jul fatigue. Nearly identical pace/HR to 22 Jul but completely different subjective feel (Strong vs Weak, 3/10 vs 5/10 effort) - proof previous dip was fatigue not fitness decline. Garmin classified Base (Low Aerobic), Aerobic TE 3.7. Goblet squats + lunges done same day."
+2026-07-24,07:44,exact,phase2,easy,outdoor,9.35,1:01:53,6:37,397,150,163,170,,8.4,274,234,Strong,3/10,,,,,,,true,"[Strong, RPE 3/10] Best clean Zone 2 data point in recent stretch - broke plateau after two flat readings (22 Jul, 24 Jul). Gap to target pace (6:10-6:15/km) narrowed to +22-27 sec, best yet. Garmin classified Base (Low Aerobic), Aerobic TE 3.6."
+2026-07-26,06:26,exact,phase2,long,outdoor,17.15,1:52:43,6:34,394,153,175,171,,8,,233,Strong,3/10,,,,,,,true,"[Strong, RPE 3/10] Best distance-pace-HR combination long run to date. Recovery HR 31 bpm (strong fitness signal). Weather good. Garmin classified Tempo (High Aerobic), Aerobic TE 4.4, Exercise Load 196. Run/walk strategy used - walk break for water approximately every 3km, timer kept running (continuous, not paused) unlike 11 Jul run. HR stayed controlled at Zone 2/3 boundary rather than clear Zone 3 overshoot seen on 11 Jul."
+2026-07-30,,exact,phase2,lthr_test,outdoor,5.51,30:10,5:29,329,162,179,163,1.12,9.6,263,287,very_weak,5/10,,,,,,,false,"[very_weak, RPE 5/10] LTHR FIELD TEST — 30-min field test, average HR of final 20 min. Window 3.83km in 20:01 @ 5:14/km -> LTHR 176 (Garmin auto-detect). Pace faded 5:05 -> 5:22 across the window while HR climbed to 179 — effort sat at or just above threshold, which is what a valid test should look like. Logged Feel as 'Very Weak' at only RPE 5/10; flag if this recurs, since it may indicate the HR reading was elevated by fatigue or illness rather than by effort. EF excluded: Activity started cold with no warm-up (HR 80 bpm at t=0). Whole-run EF is distorted by the ramp and is not comparable to steady Z2 sessions."

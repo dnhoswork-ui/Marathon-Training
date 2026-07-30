@@ -24,31 +24,99 @@ PLAN = _load("training_plan_v3.json")
 PROFILE = _load("athlete_profile.json")
 
 RACE_DATE = date.fromisoformat(PLAN["race_date"])
+ATHLETE = PROFILE.get("athlete", {})
+DEVICE = ATHLETE.get("device", "")
 
 # Streamlit Cloud runs on UTC; the athlete trains in Singapore (UTC+8), so a
 # morning run there is "tomorrow" to a UTC server. Anchor the app to local time.
-TZ = ZoneInfo({"Singapore": "Asia/Singapore"}.get(PROFILE.get("location", ""), "UTC"))
+TZ = ZoneInfo({"Singapore": "Asia/Singapore"}.get(ATHLETE.get("location", ""), "UTC"))
 
 
 def today() -> date:
     return datetime.now(TZ).date()
+
+
 PHASES = PLAN["phases"]
 GOLDEN_RULES = PLAN["golden_rules"]
 PACE_REFERENCE = PLAN["pace_reference"]
 
-# HR zones (Garmin 265 baseline — provisional until the LTHR field test)
+# ---------------------------------------------------------------- HR: versioned LTHR
+# LTHR is date-versioned. A run must always be graded against the zones that were
+# in effect the day it was run, or the whole March–July history gets retro-classified
+# against bands that did not exist yet.
 HR = PROFILE["heart_rate"]
-Z2 = (138, 154)
-Z2_TRAIN = (138, 150)
-ZONES_PROVISIONAL = "PROVISIONAL" in HR.get("status", "")
+MAX_HR = HR["max_hr"]
+RESTING_HR = HR.get("resting_hr_baseline")
 
-GPA_MAP = PROFILE["conventions"]["gpa_map"]
-SHOES = PROFILE["shoes"]
+
+def _d(s) -> date:
+    return s if isinstance(s, date) else date.fromisoformat(str(s)[:10])
+
+
+LTHR_HISTORY = sorted(HR["lthr_history"], key=lambda e: _d(e["effective_from"]))
+LTHR_CURRENT = HR.get("lthr_current") or LTHR_HISTORY[-1]["lthr"]
+# the earliest entry's start is a placeholder — surfaced in the UI, not silently trusted
+LTHR_EPOCH_IS_PLACEHOLDER = "placeholder" in (LTHR_HISTORY[0].get("note") or "").lower()
+ZONE_PCT = HR.get("zone_model_boundaries_pct", {})
+
+
+def lthr_entry_for(run_date) -> dict:
+    """The LTHR history entry in effect on run_date (earliest entry for older runs)."""
+    d = _d(run_date)
+    active = LTHR_HISTORY[0]
+    for e in LTHR_HISTORY:
+        if _d(e["effective_from"]) <= d:
+            active = e
+        else:
+            break
+    return active
+
+
+def zones_for(run_date) -> dict:
+    return lthr_entry_for(run_date)["zones_bpm"]
+
+
+def zone_of(hr, run_date) -> str | None:
+    """'z1'..'z5' for an HR reading, using the zones in effect that day."""
+    if hr is None:
+        return None
+    bands = zones_for(run_date)
+    for name in ("z1", "z2", "z3", "z4", "z5"):
+        lo, hi = bands[name]
+        if lo <= hr <= hi:
+            return name
+    return "z5" if hr > bands["z5"][1] else "z1"
+
+
+def pct_lthr(hr, run_date) -> float | None:
+    """HR as a percentage of the LTHR in effect that day — comparable across the
+    whole history, which raw bpm is not once LTHR changes."""
+    if hr is None:
+        return None
+    return round(100.0 * hr / lthr_entry_for(run_date)["lthr"], 1)
+
+
+# current-day convenience bands (charts that only describe "now")
+Z2 = tuple(zones_for(today())["z2"])
+_easy = PLAN["phases"][1].get("key_sessions", {}).get("easy", {})
+Z2_TRAIN = tuple(_easy["target_hr_bpm"]) if isinstance(_easy, dict) and _easy.get("target_hr_bpm") else Z2
+Z2_PCT = tuple(ZONE_PCT.get("z2", (80, 89)))
+ZONES_PROVISIONAL = False   # locked in by the 30 Jul field test
+
+THRESHOLD_PACE = PROFILE.get("threshold_pace", {}).get("current", {})
+CHECKPOINTS = PROFILE.get("checkpoints", [])
+KNOWN_ISSUES = PROFILE.get("known_issues", [])
+MARATHON_EQUIV = PROFILE.get("primary_race", {}).get("current_marathon_equivalent", {})
+
+GPA_MAP = PROFILE["grading"]["points"]
+GPA_RANGE = (min(GPA_MAP.values()) - 0.5, max(GPA_MAP.values()) + 0.5)
+SHOES = [{"model": v, "role": k.replace("_", " ")} for k, v in PROFILE["shoes"].items()]
 SHOE_NAMES = [s["model"] for s in SHOES]
 FUELING = PROFILE["fueling"]
-ENVIRONMENT = PROFILE["environment"]
+ENVIRONMENT = PROFILE["heat_model"]
+CONVENTIONS = PROFILE.get("conventions", {})
 
-RUN_TYPES = ["easy", "long", "tempo", "field_test", "shakeout", "race_hm", "race_fm", "strength", "other"]
+RUN_TYPES = ["easy", "long", "tempo", "lthr_test", "shakeout", "race_hm", "race_fm", "strength", "other"]
 SURFACES = ["outdoor", "treadmill"]
 GRADES = ["", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"]
 
@@ -58,14 +126,15 @@ GAPS = [
     (date(2026, 6, 15), date(2026, 6, 24), "Holiday"),
 ]
 
-# heat model: ~+2–3 s/km per °C of feels-like above 28 (use midpoint 2.5)
-HEAT_THRESHOLD_C = 28.0
-HEAT_S_PER_KM_PER_C = 2.5
+# heat model, from the profile: +15–30 s/km above the feels-like threshold.
+# The per-°C figure is the midpoint of that range spread over a ~10°C excursion.
+HEAT_THRESHOLD_C = float(ENVIRONMENT.get("feels_like_threshold_c", 28))
+_pen = ENVIRONMENT.get("pace_penalty_sec_per_km", [15, 30])
+HEAT_S_PER_KM_PER_C = round(sum(_pen) / 2 / 10, 2)
+HEAT_HR_PENALTY = ENVIRONMENT.get("hr_penalty_bpm", [5, 8])
 
 
 # ---------------------------------------------------------------- phases
-def _d(s: str) -> date:
-    return date.fromisoformat(s)
 
 
 def phase_of(d: date) -> dict | None:
@@ -151,12 +220,13 @@ def next_long_run(today: date) -> dict | None:
 # ---------------------------------------------------------------- race strategy
 # Segment pacing retained from plan v2 (still keyed to the 3:50 target); the
 # goal selector shifts every pace by a fixed offset per target.
-GOAL_OFFSETS_S = {"3:50": 0, "3:40": 14, "3:35": 21}
+GOAL_OFFSETS_S = {"3:50": 0, "3:40": 14}
 GOALS = {
     "3:50": {"label": "Sub 3:50", "pace": "5:27/km", "kind": "primary"},
     "3:40": {"label": "Sub 3:40", "pace": "5:13/km", "kind": "signal"},
-    "3:35": {"label": "Sub 3:35", "pace": "5:06/km", "kind": "stretch"},
 }
+# sub-3:35 was retired on 2026-07-30 after the field test; kept for the record
+RETIRED_GOALS = PROFILE.get("primary_race", {}).get("retired_goals", [])
 
 RACE_STRATEGY = [
     {"km": "0–5 km", "phase": "Ease In", "pace": "5:40", "zone": "Zone 2",

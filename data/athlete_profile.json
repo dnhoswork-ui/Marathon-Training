@@ -1,102 +1,264 @@
 {
-  "location": "Singapore",
-  "device": "Garmin Forerunner 265",
-  "as_of": "2026-07-18",
-  "heart_rate": {
-    "max_hr": 193,
-    "lthr": 173,
-    "rhr_current": 63,
-    "rhr_pre_illness_old_device": 52,
-    "note": "Max/LTHR/RHR re-baselined by Garmin 265 (old Amazfit read max 179, LTHR 165, RHR 52). Do not mix old and new HR baselines.",
-    "zones_model": "% of LTHR (Garmin)",
-    "zones": {
-      "Z1_warmup": "<138",
-      "Z2_easy": "138-154 (train 138-150, lower-middle)",
-      "Z3_aerobic": "154-164",
-      "Z4_threshold": "164-173",
-      "Z5_max": ">173"
-    },
-    "status": "PROVISIONAL - confirm via 30-min LTHR field test, Phase 2 week 1 (w/c 20 Jul)"
-  },
-  "prs": {
-    "half_marathon": {
-      "time": "1:56:05",
-      "race": "HM race",
-      "date": "2026-04-05",
-      "avg_pace": "5:29/km",
-      "avg_hr": 166
-    },
-    "half_marathon_previous": "2:04:43",
-    "longest_run": {
-      "distance_km": 18.01,
-      "date": "2026-07-11"
-    },
-    "cadence_best_spm": 183,
-    "vertical_osc_best_cm": 7.5,
-    "stride_length_best_m": 0.94
-  },
-  "fitness_estimates": {
-    "vo2max": "48-50 (target 52-54 by race month)",
-    "lt_pace": "5:20-5:25/km (target 5:00/km by Phase 3 end)",
-    "cardiac_drift": "~22 bpm over HM (target <15 bpm over 21km)"
-  },
-  "marathon_goal": {
-    "race_date": "2026-12-08",
-    "race_date_note": "From plan v2 - confirm official race date and update here",
-    "target_primary": {
-      "time": "3:50",
-      "pace": "5:27/km"
-    },
-    "target_stretch": {
-      "time": "3:35",
-      "pace": "5:06/km"
-    },
-    "intermediate_signal": {
-      "time": "3:40",
-      "pace": "5:13/km"
-    },
-    "stretch_decision_point": "Tune-up HM, early Oct 2026"
-  },
-  "shoes": [
+  "profile_version": 4,
+  "last_updated": "2026-07-30",
+  "changelog": [
     {
-      "model": "Asics Nimbus 25",
-      "role": "long runs"
-    },
-    {
-      "model": "Li-Ning Feidian 6 Challenger",
-      "role": "tempo + daily training"
-    },
-    {
-      "model": "Li-Ning Feidian 5 Challenger",
-      "role": "race day only - foam reserved"
+      "date": "2026-07-30",
+      "change": "LTHR updated 173 -> 176 from 30-min field test (Garmin auto-detect). Converted lthr from a scalar to a date-versioned history so historical runs are graded against the zones that were actually in effect. Retired sub-3:35 stretch goal. Revised Phase 2 tempo prescriptions."
     }
   ],
-  "fueling": {
-    "proven_hm_protocol": "3 gels: pre-start, ~km 7, caffeinated ~km 15",
-    "marathon_target": "60-90g carbs/hr = one gel every 30-35 min (6-8 gels total)",
-    "training_rule": "Full gel plan practised on every run >= 16km",
-    "pre_run": "Half banana + Milo, 60-90 min before"
+  "athlete": {
+    "location": "Singapore",
+    "training_environment": "hot_humid_year_round",
+    "device": "Garmin Forerunner 265"
   },
-  "environment": {
-    "heat_effect": "Feels-like >= 33C adds ~15-30 s/km and 5-8 bpm at easy effort",
+  "primary_race": {
+    "name": "Full Marathon",
+    "date": "2026-12-08",
+    "distance_km": 42.195,
+    "goal": {
+      "label": "sub-3:50",
+      "time": "3:50:00",
+      "pace": "5:27",
+      "pace_sec_per_km": 327,
+      "status": "active",
+      "confidence": "reachable \u2014 requires ~5-10 min of fitness gain across Phase 2 + Phase 3"
+    },
+    "retired_goals": [
+      {
+        "label": "sub-3:35",
+        "pace_sec_per_km": 306,
+        "retired_on": "2026-07-30",
+        "reason": "LTHR field test put current marathon-equivalent at 3:55-4:05. Not achievable this cycle."
+      }
+    ],
+    "current_marathon_equivalent": {
+      "range": "3:55 - 4:05",
+      "basis": "threshold pace 5:14/km measured 2026-07-30",
+      "as_of": "2026-07-30"
+    }
+  },
+  "heart_rate": {
+    "max_hr": 193,
+    "resting_hr_baseline": 56,
+    "zone_model": "garmin_percent_lthr",
+    "zone_model_boundaries_pct": {
+      "z1": [
+        0,
+        79
+      ],
+      "z2": [
+        80,
+        89
+      ],
+      "z3": [
+        90,
+        94
+      ],
+      "z4": [
+        95,
+        99
+      ],
+      "z5": [
+        100,
+        999
+      ]
+    },
+    "lthr_current": 176,
+    "lthr_history": [
+      {
+        "effective_from": "2026-03-01",
+        "effective_to": "2026-07-29",
+        "lthr": 173,
+        "source": "device rebase / estimate",
+        "confidence": "low",
+        "zones_bpm": {
+          "z1": [
+            0,
+            137
+          ],
+          "z2": [
+            138,
+            155
+          ],
+          "z3": [
+            156,
+            163
+          ],
+          "z4": [
+            164,
+            172
+          ],
+          "z5": [
+            173,
+            193
+          ]
+        },
+        "note": "TODO: effective_from is a placeholder. Replace with the real date the 173 rebase happened if it can be recovered."
+      },
+      {
+        "effective_from": "2026-07-30",
+        "effective_to": null,
+        "lthr": 176,
+        "source": "30-min field test, Garmin Forerunner 265 auto-detected threshold",
+        "confidence": "high",
+        "zones_bpm": {
+          "z1": [
+            0,
+            140
+          ],
+          "z2": [
+            141,
+            157
+          ],
+          "z3": [
+            158,
+            166
+          ],
+          "z4": [
+            167,
+            175
+          ],
+          "z5": [
+            176,
+            193
+          ]
+        }
+      }
+    ]
+  },
+  "threshold_pace": {
+    "current": {
+      "pace": "5:14",
+      "pace_sec_per_km": 314,
+      "measured_on": "2026-07-30",
+      "surface": "outdoor",
+      "conditions": "Singapore, early morning start",
+      "basis": "final 20 min of 30-min field test \u2014 3.83 km in 20:01",
+      "note": "Garmin's own reported threshold pace was not captured. If available in Connect, add it as garmin_reported for cross-check."
+    },
+    "garmin_reported": null
+  },
+  "personal_records": [
+    {
+      "distance": "half_marathon",
+      "time": "1:56:05",
+      "pace": "5:30",
+      "date": "2026-04",
+      "event": "HM race",
+      "current": true
+    },
+    {
+      "distance": "half_marathon",
+      "time": "2:04:43",
+      "current": false
+    }
+  ],
+  "heat_model": {
+    "feels_like_threshold_c": 28,
+    "pace_penalty_sec_per_km": [
+      15,
+      30
+    ],
+    "hr_penalty_bpm": [
+      5,
+      8
+    ],
+    "note": "Applies above the feels-like threshold. Use to flag runs where raw pace/HR should not be compared to cooler sessions.",
     "treadmill_conversion": "Treadmill ~15-20 s/km and ~5-8 bpm easier than outdoor Singapore; compare outdoor-to-outdoor only",
     "cool_windows": "Start before 6:30am or after 6:30pm; heat reliably arrives 7:15-7:30am"
   },
-  "conventions": {
-    "grading_scale": "A+ to C with +/- subgrades, per-metric (pace/HR/cadence) plus overall",
-    "gpa_map": {
-      "A+": 4.3,
-      "A": 4.0,
-      "A-": 3.7,
-      "B+": 3.3,
-      "B": 3.0,
-      "B-": 2.7,
-      "C+": 2.3,
-      "C": 2.0
+  "shoes": {
+    "long_run": "Asics Nimbus 25",
+    "tempo_training": "Li-Ning Feidian 6 Challenger",
+    "race_day": "Li-Ning Feidian 5 Challenger"
+  },
+  "fueling": {
+    "marathon": {
+      "gel_interval_min": [
+        30,
+        35
+      ],
+      "carbs_g_per_hour": [
+        60,
+        90
+      ]
     },
+    "half_marathon": {
+      "strategy": "three gels",
+      "timing": [
+        "pre-race",
+        "~km 7",
+        "caffeinated gel ~km 15"
+      ]
+    },
+    "training_rule": "Full gel plan practised on every run >= 16km",
+    "pre_run": "Half banana + Milo, 60-90 min before"
+  },
+  "grading": {
+    "scale": [
+      "A+",
+      "A",
+      "A-",
+      "B+",
+      "B",
+      "B-",
+      "C+",
+      "C"
+    ],
+    "points": {
+      "A+": 10,
+      "A": 9,
+      "A-": 8.5,
+      "B+": 8,
+      "B": 7,
+      "B-": 6.5,
+      "C+": 6,
+      "C": 5
+    },
+    "inputs": [
+      "avg_hr",
+      "cadence",
+      "vertical_oscillation",
+      "ground_contact_time",
+      "pace_vs_target",
+      "heat_context"
+    ]
+  },
+  "checkpoints": [
+    {
+      "id": "mp_hr_gate",
+      "name": "Marathon-pace HR gate",
+      "window": [
+        "2026-10-01",
+        "2026-10-31"
+      ],
+      "test": "Run a sustained marathon-pace segment at 5:27/km inside a long run, read avg HR",
+      "thresholds": {
+        "green": "<= 162 bpm \u2014 sub-3:50 is on",
+        "amber": "163-167 bpm \u2014 borderline, hold goal but watch",
+        "red": ">= 168 bpm \u2014 revise goal pace slower"
+      },
+      "status": "pending"
+    }
+  ],
+  "known_issues": [
+    "HR has not dropped as expected across the build \u2014 Efficiency Factor trend is the priority diagnostic.",
+    "Avg cadence 163 spm at threshold pace is low; stride length 1.12 m is doing the work. Worth a cadence drill block.",
+    "Strength training planned but not started as of 2026-07-30."
+  ],
+  "conventions": {
     "moving_average": "3-run MA for pace and HR",
     "long_run_grading": "Controlled progression - Z2 to Z3 drift acceptable late in run; easy runs held to strict Z2",
     "water_stops": "Walk through, never pause the timer (keeps HR data honest)",
     "zone_changes": "Only via field test, never watch auto-detection"
-  }
+  },
+  "_carried_forward_from_v3": [
+    "athlete.device",
+    "heat_model.treadmill_conversion",
+    "heat_model.cool_windows",
+    "fueling.training_rule",
+    "fueling.pre_run",
+    "conventions"
+  ]
 }

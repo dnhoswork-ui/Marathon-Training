@@ -70,6 +70,13 @@ def enrich(df: pd.DataFrame) -> pd.DataFrame:
     df["pace_sec_per_km"] = df["pace_sec_per_km"].fillna(computed)
     df["week"] = df["date"].map(week_monday)
     df["is_run"] = ~df["run_type"].isin(["strength", "other"])
+    # HR as % of the LTHR in effect that day — the only HR measure comparable
+    # across the 30 Jul rebase (raw bpm is not)
+    df["pct_lthr"] = [plan.pct_lthr(hr, d) if pd.notna(hr) else None
+                      for hr, d in zip(df["avg_hr"], df["date"])]
+    df["zone"] = [plan.zone_of(hr, d) if pd.notna(hr) else None
+                  for hr, d in zip(df["avg_hr"], df["date"])]
+    df["lthr_then"] = [plan.lthr_entry_for(d)["lthr"] for d in df["date"]]
     return df
 
 
@@ -82,9 +89,31 @@ def heat_adjusted(df: pd.DataFrame, on: bool) -> pd.DataFrame:
 
 
 def trend_pool(df: pd.DataFrame) -> pd.DataFrame:
-    """Rows usable for fitness trends: exact dates, no races/shakeouts."""
+    """Rows usable for fitness trends: exact dates, no races/shakeouts/field tests."""
     return df[df["is_run"] & (df["date_precision"] != "approx")
               & df["run_type"].isin(["easy", "long", "tempo"])]
+
+
+# 30 Jul 2026 LTHR rebase — annotates any HR-over-time chart so the step change
+# in zone classification doesn't look like a data bug
+LTHR_MARKS = pd.DataFrame([
+    {"d": str(e["effective_from"]),
+     "label": f"LTHR → {e['lthr']}"}
+    for e in plan.LTHR_HISTORY[1:]
+])
+
+
+def lthr_rules(y_field: str | None = None):
+    """Vertical rule + label at each LTHR change."""
+    if LTHR_MARKS.empty:
+        return []
+    rule = alt.Chart(LTHR_MARKS).mark_rule(color="#4a3aa7", strokeWidth=1.5,
+                                           strokeDash=[4, 3]).encode(
+        x="d:T", tooltip=["label:N"])
+    text = alt.Chart(LTHR_MARKS).mark_text(align="left", dx=4, dy=-6, fontSize=10,
+                                           color="#4a3aa7", fontWeight=600).encode(
+        x="d:T", y=alt.value(8), text="label:N")
+    return [rule, text]
 
 
 if "runs" not in st.session_state:
@@ -101,7 +130,8 @@ running = runs[runs["is_run"]] if not runs.empty else runs
 # ---------------------------------------------------------------- sidebar
 with st.sidebar:
     st.title("🏃 Road to Sub-3:50")
-    st.caption(f"Plan v3 · {plan.PROFILE['device']} · HM PR {plan.PROFILE['prs']['half_marathon']['time']}")
+    _pr = next((p for p in plan.PROFILE["personal_records"] if p.get("current")), {})
+    st.caption(f"Plan v3 · {plan.DEVICE} · HM PR {_pr.get('time', '—')}")
     st.metric("Days to race", DAYS_TO_RACE if DAYS_TO_RACE >= 0 else "🏅 done",
               help=plan.RACE_DATE.strftime("%A, %d %B %Y"))
     wk = plan.phase_week(CUR, TODAY)
@@ -119,6 +149,11 @@ with st.sidebar:
                             "decision_rule", "sub-1:52 hold 3:50 | sub-1:48 open 3:40 | sub-1:46 chase 3:35"))
     if plan.ZONES_PROVISIONAL:
         st.warning("HR zones are PROVISIONAL — confirm via the 30-min LTHR field test (Phase 2, week 1).")
+    else:
+        st.success(f"**LTHR {plan.LTHR_CURRENT}** · Z2 {plan.Z2[0]}–{plan.Z2[1]} bpm"
+                   + (f"\n\nThreshold pace **{plan.THRESHOLD_PACE['pace']}/km**"
+                      if plan.THRESHOLD_PACE.get("pace") else ""))
+        st.caption(f"Measured {plan.THRESHOLD_PACE.get('measured_on', '—')} by field test")
     st.divider()
     SYNCED = st.session_state["runs_source"].startswith("GitHub")
     if SYNCED:
@@ -200,15 +235,35 @@ with tab_over:
         head = CUR["name"] if CUR["id"] == "taper" else f"Phase {CUR['id'][-1]}: {CUR['name']}"
         st.subheader(head + (f" — starts {date.fromisoformat(CUR['start']):%A %d %b}" if wk == 0
                              else f" — week {wk}"))
-        if CUR.get("week_1_special") and wk <= 1 and CUR["id"] == "phase2":
-            st.error("🧪 **Week 1:** " + CUR["week_1_special"])
+        w1 = CUR.get("week_1_special")
+        if isinstance(w1, dict) and w1.get("status") == "COMPLETE":
+            st.success(f"✅ **Week 1 field test complete** ({w1['completed_on']}) — {w1['result']}. "
+                       "Zones below are measured, not estimated.")
+        elif w1 and wk <= 1 and CUR["id"] == "phase2":
+            st.error("🧪 **Week 1:** " + (w1["description"] if isinstance(w1, dict) else w1))
         tmpl = CUR.get("weekly_template")
         if tmpl:
             days = pd.DataFrame({"Day": list(tmpl), "Session": list(tmpl.values())})
             days["Today"] = ["👉" if TODAY.strftime("%a") == d else "" for d in days["Day"]]
             st.dataframe(days[["Today", "Day", "Session"]], hide_index=True, use_container_width=True)
+
         for name, detail in CUR.get("key_sessions", {}).items():
-            st.markdown(f"- **{name.replace('_', ' ').title()}**: {detail}")
+            if isinstance(detail, str):
+                st.markdown(f"- **{name.replace('_', ' ').title()}**: {detail}")
+                continue
+            bits = [detail.get("description", "")]
+            if detail.get("pace_outdoor"):
+                po, pt = detail["pace_outdoor"], detail.get("pace_treadmill", {})
+                bits.append(f"Outdoor **{po['start']} → {po['end']}/km**"
+                            + (f" (treadmill {pt['start']} → {pt['end']})" if pt else ""))
+            if detail.get("target_hr_bpm"):
+                lo, hi = detail["target_hr_bpm"]
+                bits.append(f"HR **{lo}–{hi} bpm**")
+            st.markdown(f"- **{name.replace('_', ' ').title()}**: " + " · ".join(b for b in bits if b))
+            if detail.get("note"):
+                st.caption("   " + detail["note"])
+            if detail.get("supersedes"):
+                st.caption(f"   Revised after the field test — was {detail['supersedes']}")
     with col2:
         st.subheader("Exit criteria")
         for cr in CUR.get("exit_criteria", []):
@@ -390,6 +445,18 @@ with tab_prog:
             st.warning("**Runs are only in this app's temporary storage** — they'll vanish when the app "
                        "restarts. Add the `GITHUB_TOKEN` secret to commit every run to the repo.")
 
+        # feel far below RPE — may mean the HR reading was fatigue-elevated, not effort-driven
+        odd = running[(running["feel"].astype(str).str.lower().isin(["very_weak", "weak"]))
+                      & (running["perceived_effort"].astype(str).str.extract(r"(\d+)")[0]
+                         .astype(float) <= 5)]
+        if not odd.empty:
+            latest = odd.sort_values("date").iloc[-1]
+            st.warning(f"🩺 **Feel/effort mismatch** on {latest['date']:%d %b} "
+                       f"({latest['run_type']}): felt *{latest['feel']}* at only "
+                       f"{latest['perceived_effort']}. {len(odd)} such run(s) logged. If this recurs, "
+                       "an HR reading may be elevated by fatigue or illness rather than effort — "
+                       "worth a retest before trusting zones set from it.")
+
         future = running[running["date"] > TODAY]
         if not future.empty:
             st.info(f"📅 {len(future)} run(s) are dated **after today ({TODAY:%d %b}, Singapore time)** — "
@@ -416,7 +483,10 @@ with tab_prog:
         heat_on = ctl[0].toggle(
             "🌡 Heat-adjust paces",
             help=f"Subtracts ~{plan.HEAT_S_PER_KM_PER_C:g} s/km per °C of feels-like above "
-                 f"{plan.HEAT_THRESHOLD_C:g}°C, where logged. {plan.ENVIRONMENT['heat_effect']}")
+                 f"{plan.HEAT_THRESHOLD_C:g}°C, where logged. Profile heat model: "
+                 f"+{plan.ENVIRONMENT['pace_penalty_sec_per_km'][0]}–"
+                 f"{plan.ENVIRONMENT['pace_penalty_sec_per_km'][1]} s/km and "
+                 f"+{plan.HEAT_HR_PENALTY[0]}–{plan.HEAT_HR_PENALTY[1]} bpm above the threshold.")
         ma_n = ctl[1].selectbox("Moving average", [3, 5, 7], index=0,
                                 format_func=lambda n: f"{n}-run MA")
         surf_pick = ctl[2].radio("Surface", ["Outdoor only", "Both (never mixed)"],
@@ -440,7 +510,10 @@ with tab_prog:
                 lambda x: x.rolling(ma_n, min_periods=1).mean())
             return d
 
-        aer = add_ef(pool[pool["run_type"].isin(["easy", "long"])])
+        # the LTHR test is excluded from EF by flag: it started cold (HR 80 at t=0),
+        # so whole-run EF isn't comparable to steady Z2 sessions
+        aer = add_ef(pool[pool["run_type"].isin(["easy", "long"]) & pool["include_in_ef_trend"]])
+        ef_excluded = int((~running["include_in_ef_trend"]).sum())
 
         # ---- improvement scorecard ---------------------------------------
         st.subheader("Am I improving?")
@@ -497,11 +570,13 @@ with tab_prog:
                                                 color=C_CRIT).encode(x="date:T", y="EF:Q")
             tag = alt.Chart(newest).mark_text(dy=-18, fontSize=11, fontWeight=600, color=C_CRIT).encode(
                 x="date:T", y="EF:Q", text=alt.value("latest run"))
-            st.altair_chart((raw + line + ring + tag).properties(height=300)
+            st.altair_chart(alt.layer(raw, line, ring, tag, *lthr_rules()).properties(height=300)
                             .configure_view(strokeWidth=0), use_container_width=True)
             st.caption(f"Faint dots = individual runs · bold line = {ma_n}-run moving average · "
                        "🔴 ring = your most recently logged run. **Up and to the right is fitness.** "
-                       "Lines never cross surfaces — treadmill and outdoor are separate series.")
+                       "Lines never cross surfaces — treadmill and outdoor are separate series. "
+                       "EF is speed ÷ HR, so the LTHR rebase does not affect it."
+                       + (f" {ef_excluded} run(s) excluded by flag (field test)." if ef_excluded else ""))
 
         # ---- pace trend vs target band ------------------------------------
         st.subheader("Easy/long pace vs the 6:10–6:15 outdoor target")
@@ -541,40 +616,48 @@ with tab_prog:
 
         # ---- aerobic curve, small multiples by surface ---------------------
         st.subheader("The aerobic curve — is it shifting left?")
-        sc = pool.dropna(subset=["pace_adj", "avg_hr"])
+        sc = pool.dropna(subset=["pace_adj", "pct_lthr"])
         if sc.empty:
             st.info("No runs with both pace and HR yet.")
         else:
+            lo_pct, hi_pct = plan.Z2_PCT
             surfaces = [s for s in plan.SURFACES if not sc[sc["surface"] == s].empty]
             pcols = st.columns(len(surfaces))
             for pcol, surf in zip(pcols, surfaces):
                 d = sc[sc["surface"] == surf]
-                z2band = alt.Chart(pd.DataFrame({"lo": [plan.Z2[0]], "hi": [plan.Z2[1]]})).mark_rect(
+                y_dom = [min(70, float(d["pct_lthr"].min()) - 2), max(100, float(d["pct_lthr"].max()) + 2)]
+                z2band = alt.Chart(pd.DataFrame({"lo": [lo_pct], "hi": [hi_pct]})).mark_rect(
                     color=C_OUT, opacity=0.08).encode(
-                    y=alt.Y("lo:Q", scale=alt.Scale(domain=[125, 175])), y2="hi:Q")
+                    y=alt.Y("lo:Q", scale=alt.Scale(domain=y_dom)), y2="hi:Q")
                 pts = alt.Chart(d).mark_point(filled=True, opacity=0.9, stroke="#ffffff",
                                               strokeWidth=1.5).encode(
                     x=alt.X("pace_adj:Q", title="pace (min/km)",
                             scale=alt.Scale(domain=[330, 530]),
                             axis=alt.Axis(gridColor=C_GRID, labelColor=C_MUTED, titleColor=C_MUTED,
                                           labelExpr=PACE_LABEL, tickCount=6)),
-                    y=alt.Y("avg_hr:Q", title="avg HR", scale=alt.Scale(domain=[125, 175]), axis=AXIS),
+                    y=alt.Y("pct_lthr:Q", title="% of LTHR", scale=alt.Scale(domain=y_dom), axis=AXIS),
                     color=alt.Color("date:T", title=None,
                                     scale=alt.Scale(range=["#cde2fb", "#0d366b"]),
                                     legend=alt.Legend(orient="bottom", direction="horizontal",
                                                       gradientLength=140)),
                     size=alt.Size("distance_km:Q", legend=None, scale=alt.Scale(range=[50, 320])),
                     tooltip=[alt.Tooltip("date:T"), alt.Tooltip("run_type:N"),
-                             alt.Tooltip("avg_pace:N", title="pace"), alt.Tooltip("avg_hr:Q", title="HR"),
+                             alt.Tooltip("avg_pace:N", title="pace"),
+                             alt.Tooltip("avg_hr:Q", title="HR (bpm)"),
+                             alt.Tooltip("lthr_then:Q", title="LTHR then"),
+                             alt.Tooltip("pct_lthr:Q", title="% LTHR", format=".1f"),
+                             alt.Tooltip("zone:N", title="zone that day"),
                              alt.Tooltip("distance_km:Q", title="km", format=".1f"),
                              alt.Tooltip("grade:N")])
                 with pcol:
                     st.markdown(f"**{surf.title()}** — {len(d)} runs")
                     st.altair_chart((z2band + pts).properties(height=260)
                                     .configure_view(strokeWidth=0), use_container_width=True)
-            st.caption(f"Shaded = Zone 2 ({plan.Z2[0]}–{plan.Z2[1]} bpm). Each panel is one surface — "
-                       "**pale dots are older runs, dark dots are recent**. Improving fitness moves the "
-                       "dark dots left (faster) at the same height (same HR).")
+            st.caption(f"Y axis is **HR as % of the LTHR in force that day**, so the {lo_pct}–{hi_pct}% "
+                       "Zone 2 band reads correctly on both sides of the 30 Jul rebase (173 → 176) — a "
+                       "fixed bpm band would mis-shade every run before then. Raw bpm is in the tooltip. "
+                       "Pale dots are older runs, dark dots recent; improving fitness moves the dark dots "
+                       "left at the same height.")
 
         st.divider()
 
@@ -648,18 +731,28 @@ with tab_prog:
         col3, col4 = st.columns(2)
         with col3:
             st.subheader("Run quality — grade GPA")
-            gp = R.dropna(subset=["grade_points"]).sort_values("date").copy()
-            gp["GPA_ma"] = gp["grade_points"].rolling(ma_n, min_periods=1).mean()
-            g_raw = alt.Chart(gp).mark_point(size=45, opacity=0.35, filled=True, color=C_OUT).encode(
+            graded = R.dropna(subset=["grade_points"]).sort_values("date").copy()
+            graded["GPA_ma"] = graded["grade_points"].rolling(ma_n, min_periods=1).mean()
+            # ungraded runs (e.g. the field test) stay in as null rows so the line
+            # visibly breaks instead of interpolating straight through them
+            blank = R[R["grade_points"].isna() & R["is_run"]].copy()
+            blank["GPA_ma"] = None
+            gp = pd.concat([graded, blank]).sort_values("date")
+            g_raw = alt.Chart(graded).mark_point(size=45, opacity=0.35, filled=True, color=C_OUT).encode(
                 x=alt.X("date:T", title=None, axis=AXIS),
-                y=alt.Y("grade_points:Q", title="GPA", scale=alt.Scale(domain=[1.8, 4.5]), axis=AXIS),
+                y=alt.Y("grade_points:Q", title="GPA",
+                        scale=alt.Scale(domain=list(plan.GPA_RANGE)), axis=AXIS),
                 tooltip=[alt.Tooltip("date:T"), alt.Tooltip("grade:N"), alt.Tooltip("notes:N")])
-            g_line = alt.Chart(gp).mark_line(color=C_OUT, strokeWidth=2.5, interpolate="monotone").encode(
-                x="date:T", y="GPA_ma:Q",
+            g_line = alt.Chart(gp).mark_line(color=C_OUT, strokeWidth=2.5).encode(
+                x="date:T", y=alt.Y("GPA_ma:Q", scale=alt.Scale(domain=list(plan.GPA_RANGE))),
                 tooltip=[alt.Tooltip("GPA_ma:Q", title=f"{ma_n}-run MA", format=".2f")])
-            st.altair_chart((g_raw + g_line).properties(height=230).configure_view(strokeWidth=0),
-                            use_container_width=True)
-            st.caption(f"A+ = 4.3 … C = 2.0 · faint dots = each run, line = {ma_n}-run average.")
+            g_gap = alt.Chart(blank).mark_rule(color=C_MUTED, strokeDash=[2, 3], opacity=0.7).encode(
+                x="date:T", tooltip=alt.value("Ungraded — field test, deliberately not scored"))
+            st.altair_chart(alt.layer(g_gap, g_raw, g_line, *lthr_rules()).properties(height=230)
+                            .configure_view(strokeWidth=0), use_container_width=True)
+            st.caption(f"A+ = {plan.GPA_MAP['A+']} … C = {plan.GPA_MAP['C']} · faint dots = each graded "
+                       f"run, line = {ma_n}-run average. Dashed verticals are deliberately ungraded "
+                       "sessions — a field test is a measurement, not a session to score.")
 
         with col4:
             st.subheader("Cardiac drift — long runs")
@@ -750,14 +843,25 @@ with tab_plan:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader(f"HR zones — {plan.PROFILE['device']}")
-        if plan.ZONES_PROVISIONAL:
-            st.warning("Provisional until the 30-min LTHR field test. " + plan.HR["note"])
-        z = plan.HR["zones"]
-        st.dataframe(pd.DataFrame({"Zone": list(z), "Range (bpm)": list(z.values())}),
-                     hide_index=True, use_container_width=True)
-        st.caption(f"LTHR {plan.HR['lthr']} · Max {plan.HR['max_hr']} · RHR {plan.HR['rhr_current']} "
-                   f"(rest-day rule triggers at {plan.HR['rhr_current'] + 5}+)")
+        st.subheader(f"HR zones — {plan.DEVICE}")
+        zt = pd.DataFrame([
+            {"Zone": z.upper(), "% LTHR": f"{plan.ZONE_PCT.get(z, ['', ''])[0]}–{plan.ZONE_PCT.get(z, ['', ''])[1]}%",
+             **{f"{e['lthr']} (from {e['effective_from']})": f"{e['zones_bpm'][z][0]}–{e['zones_bpm'][z][1]}"
+                for e in plan.LTHR_HISTORY}}
+            for z in ("z1", "z2", "z3", "z4", "z5")])
+        st.dataframe(zt, hide_index=True, use_container_width=True)
+        st.caption(f"Both eras shown — runs are always graded against the LTHR in force on the day. "
+                   f"Current **LTHR {plan.LTHR_CURRENT}** · Max {plan.MAX_HR} · "
+                   f"RHR baseline {plan.RESTING_HR} (rest-day rule at {plan.RESTING_HR + 5}+).")
+        if plan.LTHR_EPOCH_IS_PLACEHOLDER:
+            st.info(f"⚠️ The **{plan.LTHR_HISTORY[0]['lthr']}** era's start date "
+                    f"({plan.LTHR_HISTORY[0]['effective_from']}) is a placeholder, not the real rebase "
+                    "date. Runs before it fall back to that entry. Replace it in "
+                    "`athlete_profile.json` if the true date can be recovered.")
+        if plan.RESTING_HR and any("63" in r for r in plan.GOLDEN_RULES):
+            st.warning(f"Golden rule below still cites an RHR baseline of 63; the profile now says "
+                       f"**{plan.RESTING_HR}**. Read the rest-day trigger as "
+                       f"{plan.RESTING_HR + 5}+ bpm until the plan JSON is updated.")
         st.subheader("Pace reference")
         st.dataframe(pd.DataFrame({"Context": [k.replace('_', ' ') for k in plan.PACE_REFERENCE],
                                    "Pace": list(plan.PACE_REFERENCE.values())}),
@@ -780,12 +884,37 @@ with tab_race:
     offset = plan.GOAL_OFFSETS_S[goal_key]
 
     st.subheader("Targets & the October decision gate")
-    g1, g2, g3 = st.columns(3)
-    for gcol, (k, g) in zip((g1, g2, g3), plan.GOALS.items()):
+    gcols = st.columns(len(plan.GOALS) + 1)
+    for gcol, (k, g) in zip(gcols, plan.GOALS.items()):
         sel = "👉 " if k == goal_key else ""
         gcol.metric(f"{sel}{g['label']}", g["pace"], delta=g["kind"], delta_color="off")
+    if plan.MARATHON_EQUIV:
+        gcols[-1].metric("Current equivalent", plan.MARATHON_EQUIV["range"],
+                         delta=f"as of {plan.MARATHON_EQUIV['as_of']}", delta_color="off",
+                         help=plan.MARATHON_EQUIV["basis"])
+    for rg in plan.RETIRED_GOALS:
+        st.warning(f"🚫 **{rg['label']} retired** on {rg['retired_on']} — {rg['reason']}")
+    if plan.MARATHON_EQUIV:
+        st.caption(f"Current fitness projects to **{plan.MARATHON_EQUIV['range']}** "
+                   f"({plan.MARATHON_EQUIV['basis']}). Sub-3:50 stays the target: "
+                   + plan.PROFILE["primary_race"]["goal"].get("confidence", ""))
     tune = next(p for p in plan.PHASES if p["id"] == "phase3")["tune_up"]
     st.info(f"🔀 **Tune-up HM ({tune['window']})**, full race effort. Decision rule: {tune['decision_rule']}")
+
+    # ---- checkpoint status cards (e.g. the October marathon-pace HR gate)
+    for cp in plan.CHECKPOINTS:
+        with st.container(border=True):
+            w0, w1 = cp["window"]
+            icon = {"pending": "🕒", "passed": "✅", "failed": "🔴"}.get(cp["status"], "🕒")
+            st.markdown(f"**{icon} {cp['name']}** — {cp['status'].upper()} · window {w0} → {w1}")
+            st.caption(cp["test"])
+            tc = st.columns(3)
+            for col, (band, txt) in zip(tc, cp["thresholds"].items()):
+                col.markdown(f"{'🟢' if band == 'green' else '🟠' if band == 'amber' else '🔴'} {txt}")
+            days = (date.fromisoformat(w0) - TODAY).days
+            if cp["status"] == "pending":
+                st.caption(f"Opens in {days} days — do it inside a Phase 3 long run."
+                           if days > 0 else "Window is open — schedule it into a long run now.")
 
     # ---- Riegel predictor (feature 10)
     st.subheader("Race predictor")
@@ -827,8 +956,10 @@ with tab_race:
         st.error(plan.WALL_WARNING)
     with col2:
         st.subheader("Fueling")
-        st.markdown(f"- **Marathon target**: {plan.FUELING['marathon_target']}")
-        st.markdown(f"- **Proven HM protocol**: {plan.FUELING['proven_hm_protocol']}")
+        fm, fh = plan.FUELING["marathon"], plan.FUELING["half_marathon"]
+        st.markdown(f"- **Marathon**: {fm['carbs_g_per_hour'][0]}–{fm['carbs_g_per_hour'][1]} g carbs/h "
+                    f"= a gel every {fm['gel_interval_min'][0]}–{fm['gel_interval_min'][1]} min")
+        st.markdown(f"- **Proven HM protocol**: {fh['strategy']} — {', '.join(fh['timing'])}")
         st.markdown(f"- **Training rule**: {plan.FUELING['training_rule']}")
         st.markdown(f"- **Pre-run**: {plan.FUELING['pre_run']}")
         st.markdown(f"- **Race shoe**: {next(s['model'] for s in plan.SHOES if 'race' in s['role'])} (foam reserved)")

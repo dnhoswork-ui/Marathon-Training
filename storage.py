@@ -24,7 +24,8 @@ COLUMNS = [
     "date", "start_time", "date_precision", "phase", "run_type", "surface", "distance_km", "duration",
     "avg_pace", "pace_sec_per_km", "avg_hr", "max_hr", "cadence_spm", "stride_length_m",
     "vertical_osc_cm", "gct_ms", "avg_power_w", "feel", "perceived_effort",
-    "grade", "grade_points", "shoe", "feels_like_c", "hr_first_half", "hr_second_half", "notes",
+    "grade", "grade_points", "shoe", "feels_like_c", "hr_first_half", "hr_second_half",
+    "include_in_ef_trend", "notes",
 ]
 NUMERIC = ["distance_km", "pace_sec_per_km", "avg_hr", "max_hr", "cadence_spm", "stride_length_m",
            "vertical_osc_cm", "gct_ms", "avg_power_w", "grade_points", "feels_like_c",
@@ -70,6 +71,10 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
     for col in NUMERIC:
         df[col] = pd.to_numeric(df[col], errors="coerce")
+    # runs predating the flag participate in the EF trend by default
+    df["include_in_ef_trend"] = (df["include_in_ef_trend"].astype(str).str.lower()
+                                 .isin(["true", "1", "yes"])
+                                 | df["include_in_ef_trend"].isna())
     df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
     return df
 
