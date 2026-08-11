@@ -123,7 +123,10 @@
             176,
             193
           ]
-        }
+        },
+        "conditions": "Singapore, evening start 18:14",
+        "caveat": "Test run in evening heat, not morning. Evening conditions elevate HR at a given effort, so 176 may sit 1-2 bpm high. Zones stand, but schedule the September retest for a morning slot so the two tests are comparable.",
+        "retest_due": "2026-09"
       }
     ]
   },
@@ -133,7 +136,7 @@
       "pace_sec_per_km": 314,
       "measured_on": "2026-07-30",
       "surface": "outdoor",
-      "conditions": "Singapore, early morning start",
+      "conditions": "Singapore, evening start 18:14",
       "basis": "final 20 min of 30-min field test \u2014 3.83 km in 20:01",
       "note": "Garmin's own reported threshold pace was not captured. If available in Connect, add it as garmin_reported for cross-check."
     },
@@ -245,7 +248,9 @@
   "known_issues": [
     "HR has not dropped as expected across the build \u2014 Efficiency Factor trend is the priority diagnostic.",
     "Avg cadence 163 spm at threshold pace is low; stride length 1.12 m is doing the work. Worth a cadence drill block.",
-    "Strength training planned but not started as of 2026-07-30."
+    "Strength training planned but not started as of 2026-07-30.",
+    "Garmin sweat_loss_ml is a flat 1000 ml/hr constant, not a measurement. True rate in Singapore heat is likely 1.5-2 L/hr. Not stored or charted; do not treat device figures as measured.",
+    "Three runs previously assumed to be morning sessions were evening (31 Jul 17:12, 1 Aug 18:00, 30 Jul 18:14). Pace/HR comparisons across runs need the time_of_day filter."
   ],
   "conventions": {
     "moving_average": "3-run MA for pace and HR",
@@ -260,5 +265,12 @@
     "fueling.training_rule",
     "fueling.pre_run",
     "conventions"
-  ]
+  ],
+  "fuelling_programme": {
+    "objective": "Gut training toward 60 g carbs/hr",
+    "current_g_per_hour": 20,
+    "target_g_per_hour": 60,
+    "ladder": "3 gels next long run, then 4, 5, 6 \u2014 reaching 60 g/hr at the October 30 km runs",
+    "as_of": "2026-08-09"
+  }
 }

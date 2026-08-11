@@ -77,6 +77,14 @@ def enrich(df: pd.DataFrame) -> pd.DataFrame:
     df["zone"] = [plan.zone_of(hr, d) if pd.notna(hr) else None
                   for hr, d in zip(df["avg_hr"], df["date"])]
     df["lthr_then"] = [plan.lthr_entry_for(d)["lthr"] for d in df["date"]]
+    df["time_of_day"] = df["start_time"].map(plan.time_of_day)
+    # W/bpm: work done per heartbeat. Unlike EF it is indifferent to terrain and
+    # heat, which makes it the cleanest fatigue signal available.
+    df["watts_per_bpm"] = (df["avg_power_w"] / df["avg_hr"]).round(3)
+    df["grey_zone"] = [plan.grey_zone_flag(t, z) if pd.notna(z) else False
+                       for t, z in zip(df["run_type"], df["z3_pct"])]
+    df["zones_known"] = df["z3_pct"].notna()
+    df["pace_comparable"] = df["surface"].isin(plan.PACE_COMPARABLE_SURFACES)
     return df
 
 
@@ -457,6 +465,30 @@ with tab_prog:
                        "an HR reading may be elevated by fatigue or illness rather than effort — "
                        "worth a retest before trusting zones set from it.")
 
+        # grey-zone leakage: only meaningful on easy-intent runs
+        grey = running[running["grey_zone"]]
+        if not grey.empty:
+            g = grey.sort_values("date").iloc[-1]
+            st.warning(f"⚠️ **Grey-zone leakage** on {g['date']:%d %b} ({g['run_type']}): "
+                       f"{g['z3_pct']:.0f}% of the run in Z3 on an easy-intent session. "
+                       f"{len(grey)} such run(s). Easy runs should sit in Z2 — Z3 costs recovery "
+                       "without the adaptation of a real tempo. (Long, tempo and race sessions are "
+                       "exempt: there Z3 is marathon specificity, not leakage.)")
+
+        # only meaningful from the point time-in-zone started being captured —
+        # earlier runs never had it and flagging them all is noise
+        zone_era = running.loc[running["zones_known"], "date"].min() if running["zones_known"].any() else None
+        if zone_era is not None:
+            no_zones = running[(running["date"] >= zone_era) & ~running["zones_known"]
+                               & running["avg_hr"].notna()]
+            if not no_zones.empty:
+                dates = ", ".join(f"{d:%d %b}" for d in sorted(no_zones["date"]))
+                st.info(f"🔍 **{len(no_zones)} run(s) since {zone_era:%d %b} have no time-in-zone "
+                        f"data** ({dates}). Their zone classification is inferred from average HR "
+                        "alone — low-confidence, not a measured distribution. Backfill from Garmin "
+                        "if it matters. (Runs before "
+                        f"{zone_era:%d %b} never captured it and aren't counted here.)")
+
         future = running[running["date"] > TODAY]
         if not future.empty:
             st.info(f"📅 {len(future)} run(s) are dated **after today ({TODAY:%d %b}, Singapore time)** — "
@@ -489,15 +521,25 @@ with tab_prog:
                  f"+{plan.HEAT_HR_PENALTY[0]}–{plan.HEAT_HR_PENALTY[1]} bpm above the threshold.")
         ma_n = ctl[1].selectbox("Moving average", [3, 5, 7], index=0,
                                 format_func=lambda n: f"{n}-run MA")
-        surf_pick = ctl[2].radio("Surface", ["Outdoor only", "Both (never mixed)"],
+        surf_pick = ctl[2].radio("Surface", ["Road only (comparable)", "All surfaces"],
                                  horizontal=True,
-                                 help="Treadmill runs are ~15–20 s/km easier than outdoor Singapore — "
-                                      "they're always kept on separate lines, never averaged together.")
+                                 help="Treadmill runs are ~15–20 s/km easier than outdoor Singapore, "
+                                      "and mixed/gravel routes cost 10–20 s/km at equal effort. "
+                                      "Neither belongs in a pace trend — power (W/bpm) is the "
+                                      "surface-independent comparator.")
+        tod_pick = st.multiselect(
+            "Time of day", plan.TIMES_OF_DAY, default=plan.TIMES_OF_DAY,
+            help="Singapore mornings and evenings are different thermal environments — comparing a "
+                 "17:12 run against an 06:01 run produces a false fitness signal.")
 
         R = heat_adjusted(running, heat_on)
         pool = trend_pool(R)
-        if surf_pick == "Outdoor only":
-            pool = pool[pool["surface"] == "outdoor"]
+        if surf_pick == "Road only (comparable)":
+            pool = pool[pool["pace_comparable"]]
+        if set(tod_pick) != set(plan.TIMES_OF_DAY):
+            pool = pool[pool["time_of_day"].isin(tod_pick)]
+            st.caption(f"Filtered to **{', '.join(tod_pick) or 'nothing'}** starts — "
+                       f"{len(pool)} of {len(trend_pool(R))} trend-eligible runs.")
 
         def add_ef(d: pd.DataFrame) -> pd.DataFrame:
             d = d.dropna(subset=["pace_adj", "avg_hr"]).sort_values("date").copy()
@@ -577,6 +619,36 @@ with tab_prog:
                        "Lines never cross surfaces — treadmill and outdoor are separate series. "
                        "EF is speed ÷ HR, so the LTHR rebase does not affect it."
                        + (f" {ef_excluded} run(s) excluded by flag (field test)." if ef_excluded else ""))
+
+        # ---- watts per bpm: terrain- and heat-independent fatigue signal ---
+        st.subheader("Power efficiency — watts per heartbeat")
+        wb = R.dropna(subset=["watts_per_bpm"]).sort_values("date").copy()
+        if wb.empty:
+            st.info("Log **avg power** to build this. W/bpm is indifferent to terrain and heat, "
+                    "so it catches fatigue that pace-based metrics miss.")
+        else:
+            wb["wb_ma"] = wb["watts_per_bpm"].rolling(ma_n, min_periods=1).mean()
+            w_raw = alt.Chart(wb).mark_point(size=55, opacity=0.45, filled=True).encode(
+                x=alt.X("date:T", title=None, axis=AXIS),
+                y=alt.Y("watts_per_bpm:Q", title="W per bpm",
+                        scale=alt.Scale(zero=False), axis=AXIS),
+                color=alt.Color("surface:N", scale=alt.Scale(
+                    domain=plan.SURFACES, range=[C_OUT, C_TM, "#eb6834"]),
+                    legend=alt.Legend(orient="top", title=None)),
+                tooltip=[alt.Tooltip("date:T"), alt.Tooltip("run_type:N"),
+                         alt.Tooltip("surface:N"), alt.Tooltip("avg_power_w:Q", title="power (W)"),
+                         alt.Tooltip("avg_hr:Q", title="HR"),
+                         alt.Tooltip("watts_per_bpm:Q", title="W/bpm", format=".3f"),
+                         alt.Tooltip("feel:N")])
+            w_line = alt.Chart(wb).mark_line(color=C_OUT, strokeWidth=2.5,
+                                             interpolate="monotone").encode(
+                x="date:T", y=alt.Y("wb_ma:Q", scale=alt.Scale(zero=False)))
+            st.altair_chart(alt.layer(w_raw, w_line, *lthr_rules()).properties(height=250)
+                            .configure_view(strokeWidth=0), use_container_width=True)
+            st.caption("Work done per heartbeat. **Unlike pace or EF this is unaffected by terrain "
+                       "or heat**, which makes it the earliest fatigue signal — it caught the 2 Aug "
+                       "decoupling (1.61 → 1.54, a 4.5% loss in 24 h) before anything else did. "
+                       "All surfaces are included here on purpose.")
 
         # ---- pace trend vs target band ------------------------------------
         st.subheader("Easy/long pace vs the 6:10–6:15 outdoor target")
@@ -723,8 +795,32 @@ with tab_prog:
             x="date:T", y="distance_km:Q", text="grade:N")
         st.altair_chart((plan_line + act_line + act_pts + chips + now_rule).properties(height=290)
                         .configure_view(strokeWidth=0), use_container_width=True)
-        st.caption("Dashed gray = the planned ladder including down weeks, peaking at 32 km on 14 Nov · "
-                   "🟦 solid = your actual long runs, labelled with the grade you gave each one.")
+        st.caption("Dashed gray = the planned ladder including down weeks · 🟦 solid = your actual "
+                   "long runs, labelled with the grade you gave each one. The two key runs are now "
+                   "**time-capped at 3:15** — aerobic return plateaus past ~3 h while "
+                   "musculoskeletal cost keeps climbing.")
+
+        # ---- fuelling: gut training toward the race carb rate
+        fuel = R[R["carbs_g_per_hour"].notna()].sort_values("date")
+        if not fuel.empty:
+            st.subheader("Gut training — carbs per hour on long runs")
+            prog = plan.PROFILE.get("fuelling_programme", {})
+            if prog:
+                st.caption(f"{prog['objective']} · ladder: {prog['ladder']}")
+            for _, f in fuel.tail(4).iterrows():
+                tgt = f["target_g_per_hour"] or 60
+                pct = min(f["carbs_g_per_hour"] / tgt, 1.0)
+                cA, cB = st.columns([1, 3])
+                cA.markdown(f"**{f['date']:%d %b}** · {f['distance_km']:.1f} km")
+                with cB:
+                    st.progress(pct, text=f"{f['carbs_g_per_hour']:.0f} of {tgt:.0f} g/h "
+                                          f"({pct * 100:.0f}%) · {int(f['gels_count'])} gels"
+                                          + (f" at km {f['gel_timing_km']}" if f["gel_timing_km"] else "")
+                                          + (f" · caffeine at km {f['caffeine_gel_km']:.0f}"
+                                             if pd.notna(f["caffeine_gel_km"]) else "")
+                                          + (f" · gut: {f['gut_tolerance']}" if f["gut_tolerance"] else ""))
+            st.caption("Race target is 60–90 g/h. Rate has to be trained — the gut adapts slower than "
+                       "the legs, so the ladder steps up one gel per long run.")
 
         st.divider()
 
@@ -838,8 +934,20 @@ with tab_plan:
     st.subheader("Long-run ladder")
     lad = pd.DataFrame(plan.full_ladder())
     lad["type"] = lad.get("type", pd.Series()).fillna("build")
-    lad = lad.rename(columns={"date": "Date", "km": "Km", "type": "Type", "phase": "Phase"})
-    st.dataframe(lad[["Date", "Km", "Type", "Phase"]], hide_index=True, use_container_width=True)
+    lad["Target"] = [row.get("label") or f"{row['km']:g} km" for _, row in lad.iterrows()]
+    lad["Test"] = [row.get("scheduled_test", {}).get("name", "") if isinstance(
+        row.get("scheduled_test"), dict) else "" for _, row in lad.iterrows()]
+    lad = lad.rename(columns={"date": "Date", "type": "Type", "phase": "Phase"})
+    st.dataframe(lad[["Date", "Target", "Type", "Test", "Phase"]],
+                 hide_index=True, use_container_width=True)
+    st.caption("The two key runs are **time targets, not distance targets** — 30 km *or* 3:15, "
+               "whichever comes first. 10 and 17 Oct were also swapped so the block's biggest "
+               "session doesn't land at the end of two consecutive build weeks.")
+    for step in plan.full_ladder():
+        t = step.get("scheduled_test")
+        if isinstance(t, dict):
+            st.info(f"🎯 **{t['name']}** scheduled into the {step['date']} long run — {t['protocol']}. "
+                    + " · ".join(f"{k}: {v}" for k, v in t["thresholds"].items()))
 
     col1, col2 = st.columns(2)
     with col1:

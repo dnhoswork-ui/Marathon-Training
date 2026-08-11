@@ -116,8 +116,37 @@ FUELING = PROFILE["fueling"]
 ENVIRONMENT = PROFILE["heat_model"]
 CONVENTIONS = PROFILE.get("conventions", {})
 
-RUN_TYPES = ["easy", "long", "tempo", "lthr_test", "shakeout", "race_hm", "race_fm", "strength", "other"]
-SURFACES = ["outdoor", "treadmill"]
+RUN_TYPES = ["easy", "steady", "long", "tempo", "lthr_test", "shakeout",
+             "race_hm", "race_fm", "strength", "other"]
+SURFACES = ["outdoor", "treadmill", "mixed"]
+# only outdoor road is comparable for pace trends: treadmill runs ~15–20 s/km easier,
+# and mixed/trail surfaces cost 10–20 s/km at equivalent effort
+PACE_COMPARABLE_SURFACES = ["outdoor"]
+
+# Z3 above this share is grey-zone leakage on an easy-intent run — but on a long,
+# tempo or race session Z3 is marathon specificity (goal MP 5:27/km ≈ 162 bpm,
+# inside the 158–166 Z3 band), so those session types are exempt.
+GREY_ZONE_Z3_PCT = 50
+GREY_ZONE_EXEMPT = ("long", "tempo", "race_hm", "race_fm", "lthr_test")
+
+
+def grey_zone_flag(run_type, z3_pct) -> bool:
+    if run_type in GREY_ZONE_EXEMPT or z3_pct is None:
+        return False
+    return z3_pct > GREY_ZONE_Z3_PCT
+
+
+def time_of_day(start: str | None) -> str | None:
+    """Singapore mornings and evenings are different thermal environments —
+    comparing a 17:12 run with an 06:01 run produces a false fitness signal."""
+    if not start or ":" not in str(start):
+        return None
+    h, m = (int(x) for x in str(start).split(":")[:2])
+    mins = h * 60 + m
+    return "morning" if mins < 11 * 60 else "midday" if mins < 16 * 60 else "evening"
+
+
+TIMES_OF_DAY = ["morning", "midday", "evening"]
 GRADES = ["", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"]
 
 # real gaps — annotate, never interpolate

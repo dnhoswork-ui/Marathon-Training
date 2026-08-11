@@ -25,11 +25,18 @@ COLUMNS = [
     "avg_pace", "pace_sec_per_km", "avg_hr", "max_hr", "cadence_spm", "stride_length_m",
     "vertical_osc_cm", "gct_ms", "avg_power_w", "feel", "perceived_effort",
     "grade", "grade_points", "shoe", "feels_like_c", "hr_first_half", "hr_second_half",
+    "surface_detail", "sub_type",
+    "z1_pct", "z2_pct", "z3_pct", "z4_pct", "z5_pct", "dominant_zone",
+    "exercise_load", "te_aerobic",
+    "gels_count", "gel_timing_km", "caffeine_gel_km",
+    "carbs_g_per_hour", "target_g_per_hour", "gut_tolerance",
     "include_in_ef_trend", "notes",
 ]
 NUMERIC = ["distance_km", "pace_sec_per_km", "avg_hr", "max_hr", "cadence_spm", "stride_length_m",
            "vertical_osc_cm", "gct_ms", "avg_power_w", "grade_points", "feels_like_c",
-           "hr_first_half", "hr_second_half"]
+           "hr_first_half", "hr_second_half",
+           "z1_pct", "z2_pct", "z3_pct", "z4_pct", "z5_pct", "exercise_load", "te_aerobic",
+           "gels_count", "caffeine_gel_km", "carbs_g_per_hour", "target_g_per_hour"]
 API = "https://api.github.com"
 
 

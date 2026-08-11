@@ -199,12 +199,31 @@
         },
         {
           "date": "2026-10-10",
-          "km": 26
+          "km": 30,
+          "type": "key",
+          "swapped_with": "2026-10-17",
+          "swap_reason": "Order reversed 11 Aug: 26 -> 30 km put the block's biggest session at the end of two consecutive build weeks with no down week. Same total, gentler ramp.",
+          "target_type": "time_or_distance",
+          "time_cap_min": 195,
+          "label": "30 km or 3:15, whichever comes first",
+          "km_note": "30 km is the derived estimate at 6:31/km; the 3:15 cap governs",
+          "basis": "3-hour cap \u2014 aerobic return plateaus past ~3h, musculoskeletal cost does not",
+          "scheduled_test": {
+            "id": "mp_hr_gate",
+            "name": "Marathon-pace HR gate",
+            "protocol": "Z2 base, then a sustained block at 5:27/km; read avg HR over the block",
+            "thresholds": {
+              "green": "<=162 bpm \u2014 sub-3:50 is on",
+              "amber": "163-167 bpm \u2014 borderline, hold goal but watch",
+              "red": ">=168 bpm \u2014 revise goal pace slower"
+            },
+            "note": "The sub-3:50 go/no-go."
+          }
         },
         {
           "date": "2026-10-17",
-          "km": 30,
-          "type": "key"
+          "km": 26,
+          "type": "build"
         },
         {
           "date": "2026-10-24",
@@ -221,8 +240,13 @@
         },
         {
           "date": "2026-11-14",
-          "km": 32,
-          "type": "key_final"
+          "km": 30,
+          "type": "key_final",
+          "target_type": "time_or_distance",
+          "time_cap_min": 195,
+          "label": "30 km or 3:15, whichever comes first",
+          "km_note": "32 km is the derived estimate at 6:31/km; the 3:15 cap governs",
+          "basis": "3-hour cap \u2014 aerobic return plateaus past ~3h, musculoskeletal cost does not"
         }
       ],
       "exit_criteria": [
