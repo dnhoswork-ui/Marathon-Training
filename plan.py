@@ -122,6 +122,12 @@ SURFACES = ["outdoor", "treadmill", "mixed"]
 # only outdoor road is comparable for pace trends: treadmill runs ~15–20 s/km easier,
 # and mixed/trail surfaces cost 10–20 s/km at equivalent effort
 PACE_COMPARABLE_SURFACES = ["outdoor"]
+# Power is terrain-independent between outdoor surfaces — road vs gravel, flat vs
+# rolling — which is why mixed routes belong on a W/bpm chart even though they are
+# not pace-comparable. It does not extend to treadmill: no air resistance.
+POWER_COMPARABLE_SURFACES = ["outdoor", "mixed"]
+FATIGUE_WINDOW_DAYS = 10
+FATIGUE_DROP_PCT = 3.0
 
 # Z3 above this share is grey-zone leakage on an easy-intent run — but on a long,
 # tempo or race session Z3 is marathon specificity (goal MP 5:27/km ≈ 162 bpm,

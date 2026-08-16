@@ -20,14 +20,24 @@ for _m in (plan, storage, run_parser):
 
 st.set_page_config(page_title="Road to Sub-3:50", page_icon="🏃", layout="wide")
 
-# validated palette (dataviz): outdoor=blue, treadmill=green, plan/targets=muted
+# validated palette (dataviz): outdoor=blue, treadmill=green, mixed=mauve,
+# plan/targets=muted. All-pairs CVD-checked against both surfaces.
 C_OUT = "#2a78d6"
 C_TM = "#008300"
+C_MIX = "#a8577a"
 C_MUTED = "#898781"
 C_GRID = "#e1e0d9"
 C_BAND = "#9ec5f4"
 C_CRIT = "#d03b3b"
-SURF_SCALE = alt.Scale(domain=["outdoor", "treadmill"], range=[C_OUT, C_TM])
+SURF_COLORS = {"outdoor": C_OUT, "mixed": C_MIX, "treadmill": C_TM}
+SURF_SCALE = alt.Scale(domain=list(SURF_COLORS), range=list(SURF_COLORS.values()))
+
+
+def surf_scale(d: pd.DataFrame) -> alt.Scale:
+    """Colour scale limited to the surfaces actually plotted, so a filtered-out
+    series never lingers in the legend as an entry with no marks."""
+    present = [s for s in SURF_COLORS if s in set(d["surface"])]
+    return alt.Scale(domain=present, range=[SURF_COLORS[s] for s in present])
 AXIS = alt.Axis(gridColor=C_GRID, domainColor=C_GRID, labelColor=C_MUTED, titleColor=C_MUTED)
 PACE_LABEL = "floor(datum.value/60) + ':' + (datum.value%60 < 10 ? '0' : '') + toString(round(datum.value%60))"
 
@@ -84,7 +94,10 @@ def enrich(df: pd.DataFrame) -> pd.DataFrame:
     df["grey_zone"] = [plan.grey_zone_flag(t, z) if pd.notna(z) else False
                        for t, z in zip(df["run_type"], df["z3_pct"])]
     df["zones_known"] = df["z3_pct"].notna()
+    # pace: road only. power: road + mixed — terrain-independent between outdoor
+    # surfaces, but not against a treadmill belt with no air resistance.
     df["pace_comparable"] = df["surface"].isin(plan.PACE_COMPARABLE_SURFACES)
+    df["power_comparable"] = df["surface"].isin(plan.POWER_COMPARABLE_SURFACES)
     return df
 
 
@@ -100,6 +113,27 @@ def trend_pool(df: pd.DataFrame) -> pd.DataFrame:
     """Rows usable for fitness trends: exact dates, no races/shakeouts/field tests."""
     return df[df["is_run"] & (df["date_precision"] != "approx")
               & df["run_type"].isin(["easy", "long", "tempo"])]
+
+
+def fatigue_pool(df: pd.DataFrame, days: int) -> pd.DataFrame:
+    """Same-intensity W/bpm comparison set: Z2 only, outdoor or mixed, recent.
+
+    Treadmill is dropped (no air resistance, so power isn't comparable) and so is
+    anything flagged out of the EF trend (the 30 Jul field test — a maximal effort
+    inflates W/bpm). Zone is the filter, but a run with no time-in-zone recorded
+    still qualifies on run_type: 2 Aug is the reference case for the whole panel
+    and has no zone data, so filtering on zone alone would discard the very
+    decoupling this chart exists to catch.
+    """
+    d = df[df["is_run"] & df["power_comparable"]
+           & df["include_in_ef_trend"]].dropna(subset=["watts_per_bpm"]).copy()
+    inferred = d["dominant_zone"].isna() & d["run_type"].isin(["easy", "long"])
+    d = d[(d["dominant_zone"] == "z2") | inferred]
+    d["zone_inferred"] = inferred.reindex(d.index, fill_value=False)
+    d = d[d["date"] >= plan.today() - timedelta(days=days)].sort_values("date")
+    d["wbpm_delta_pct"] = d["watts_per_bpm"].pct_change() * 100
+    d["fatigue_flag"] = d["wbpm_delta_pct"] < -plan.FATIGUE_DROP_PCT
+    return d
 
 
 # 30 Jul 2026 LTHR rebase — annotates any HR-over-time chart so the step change
@@ -521,12 +555,12 @@ with tab_prog:
                  f"+{plan.HEAT_HR_PENALTY[0]}–{plan.HEAT_HR_PENALTY[1]} bpm above the threshold.")
         ma_n = ctl[1].selectbox("Moving average", [3, 5, 7], index=0,
                                 format_func=lambda n: f"{n}-run MA")
-        surf_pick = ctl[2].radio("Surface", ["Road only (comparable)", "All surfaces"],
+        surf_pick = ctl[2].radio("Surface", ["Outdoor + mixed", "All surfaces"],
                                  horizontal=True,
                                  help="Treadmill runs are ~15–20 s/km easier than outdoor Singapore, "
-                                      "and mixed/gravel routes cost 10–20 s/km at equal effort. "
-                                      "Neither belongs in a pace trend — power (W/bpm) is the "
-                                      "surface-independent comparator.")
+                                      "so they never belong in a pace trend. Mixed/gravel routes cost "
+                                      "10–20 s/km at equal effort — they are kept, but as their own "
+                                      "series, never averaged into the road line.")
         tod_pick = st.multiselect(
             "Time of day", plan.TIMES_OF_DAY, default=plan.TIMES_OF_DAY,
             help="Singapore mornings and evenings are different thermal environments — comparing a "
@@ -534,8 +568,8 @@ with tab_prog:
 
         R = heat_adjusted(running, heat_on)
         pool = trend_pool(R)
-        if surf_pick == "Road only (comparable)":
-            pool = pool[pool["pace_comparable"]]
+        if surf_pick == "Outdoor + mixed":
+            pool = pool[pool["surface"].isin(["outdoor", "mixed"])]
         if set(tod_pick) != set(plan.TIMES_OF_DAY):
             pool = pool[pool["time_of_day"].isin(tod_pick)]
             st.caption(f"Filtered to **{', '.join(tod_pick) or 'nothing'}** starts — "
@@ -596,59 +630,109 @@ with tab_prog:
             newest = aer.sort_values("date").tail(1)
             multi_surf = aer["surface"].nunique() > 1
             ef_legend = alt.Legend(orient="top", title=None) if multi_surf else None
+            ef_surf = surf_scale(aer)
+            # padded so the ringed newest run and its label aren't clipped at the edge
+            ef_x = alt.X("date:T", title=None, axis=AXIS, scale=alt.Scale(padding=34))
             raw = alt.Chart(aer).mark_point(size=45, opacity=0.35, filled=True).encode(
-                x=alt.X("date:T", title=None, axis=AXIS),
-                y=alt.Y("EF:Q", title="m/min per bpm", scale=alt.Scale(zero=False), axis=AXIS),
-                color=alt.Color("surface:N", scale=SURF_SCALE, legend=ef_legend),
+                ef_x,
+                y=alt.Y("EF:Q", title="m/min per bpm",
+                        scale=alt.Scale(zero=False, padding=16), axis=AXIS),
+                color=alt.Color("surface:N", scale=ef_surf, legend=ef_legend),
                 tooltip=[alt.Tooltip("date:T", title="Date"), alt.Tooltip("run_type:N", title="Type"),
                          alt.Tooltip("surface:N"), alt.Tooltip("EF:Q", title="EF", format=".3f"),
                          alt.Tooltip("avg_pace:N", title="pace"), alt.Tooltip("avg_hr:Q", title="HR"),
                          alt.Tooltip("distance_km:Q", title="km", format=".1f")])
-            line = alt.Chart(aer).mark_line(strokeWidth=2.5, interpolate="monotone").encode(
-                x="date:T", y="EF_ma:Q",
-                color=alt.Color("surface:N", scale=SURF_SCALE, legend=None),
+            # straight segments, not a spline: splines undershoot at the series edge,
+            # which dragged the endpoint below every point it was averaging
+            line = alt.Chart(aer).mark_line(strokeWidth=2.5).encode(
+                ef_x, y="EF_ma:Q",
+                color=alt.Color("surface:N", scale=ef_surf, legend=None),
                 tooltip=[alt.Tooltip("date:T"), alt.Tooltip("EF_ma:Q", title=f"{ma_n}-run MA", format=".3f")])
             ring = alt.Chart(newest).mark_point(size=180, filled=False, strokeWidth=2.5,
-                                                color=C_CRIT).encode(x="date:T", y="EF:Q")
-            tag = alt.Chart(newest).mark_text(dy=-18, fontSize=11, fontWeight=600, color=C_CRIT).encode(
-                x="date:T", y="EF:Q", text=alt.value("latest run"))
+                                                color=C_CRIT).encode(ef_x, y="EF:Q")
+            tag = alt.Chart(newest).mark_text(dy=-20, dx=-14, align="right", fontSize=11,
+                                              fontWeight=600, color=C_CRIT).encode(
+                ef_x, y="EF:Q", text=alt.value("latest run"))
             st.altair_chart(alt.layer(raw, line, ring, tag, *lthr_rules()).properties(height=300)
                             .configure_view(strokeWidth=0), use_container_width=True)
             st.caption(f"Faint dots = individual runs · bold line = {ma_n}-run moving average · "
                        "🔴 ring = your most recently logged run. **Up and to the right is fitness.** "
-                       "Lines never cross surfaces — treadmill and outdoor are separate series. "
-                       "EF is speed ÷ HR, so the LTHR rebase does not affect it."
+                       "Lines never cross surfaces — each is its own series. **Mixed (≈50% gravel) "
+                       "is plotted separately on purpose:** gravel costs 10–20 s/km at equal effort, "
+                       "so EF is understated on those runs and averaging them into the road line "
+                       "would fake a decline. EF is speed ÷ HR, so the LTHR rebase does not affect it."
                        + (f" {ef_excluded} run(s) excluded by flag (field test)." if ef_excluded else ""))
 
-        # ---- watts per bpm: terrain- and heat-independent fatigue signal ---
-        st.subheader("Power efficiency — watts per heartbeat")
-        wb = R.dropna(subset=["watts_per_bpm"]).sort_values("date").copy()
-        if wb.empty:
-            st.info("Log **avg power** to build this. W/bpm is indifferent to terrain and heat, "
-                    "so it catches fatigue that pace-based metrics miss.")
+        # ---- watts per bpm: a fatigue detector, not a fitness trend ----------
+        # W/bpm scales with intensity, so a long multi-zone trend line is noise.
+        # Its one real strength is short-window, same-intensity comparison.
+        st.subheader("Fatigue watch — watts per heartbeat")
+        fw_days = st.slider("Window (days)", 7, 42, plan.FATIGUE_WINDOW_DAYS, step=7,
+                            help="Short by design. This is a same-intensity comparison, not a "
+                                 "fitness trend — widen it only to see whether a flag repeats.")
+        wb = fatigue_pool(R, fw_days)
+        if len(wb) < 2:
+            st.info(f"Need two qualifying Z2 runs in the last {fw_days} days to compare — "
+                    f"you have {len(wb)}. Qualifying means outdoor or mixed, Z2, with avg power "
+                    "logged.")
         else:
-            wb["wb_ma"] = wb["watts_per_bpm"].rolling(ma_n, min_periods=1).mean()
-            w_raw = alt.Chart(wb).mark_point(size=55, opacity=0.45, filled=True).encode(
-                x=alt.X("date:T", title=None, axis=AXIS),
-                y=alt.Y("watts_per_bpm:Q", title="W per bpm",
-                        scale=alt.Scale(zero=False), axis=AXIS),
-                color=alt.Color("surface:N", scale=alt.Scale(
-                    domain=plan.SURFACES, range=[C_OUT, C_TM, "#eb6834"]),
-                    legend=alt.Legend(orient="top", title=None)),
-                tooltip=[alt.Tooltip("date:T"), alt.Tooltip("run_type:N"),
-                         alt.Tooltip("surface:N"), alt.Tooltip("avg_power_w:Q", title="power (W)"),
-                         alt.Tooltip("avg_hr:Q", title="HR"),
-                         alt.Tooltip("watts_per_bpm:Q", title="W/bpm", format=".3f"),
-                         alt.Tooltip("feel:N")])
-            w_line = alt.Chart(wb).mark_line(color=C_OUT, strokeWidth=2.5,
-                                             interpolate="monotone").encode(
-                x="date:T", y=alt.Y("wb_ma:Q", scale=alt.Scale(zero=False)))
-            st.altair_chart(alt.layer(w_raw, w_line, *lthr_rules()).properties(height=250)
+            drop = plan.FATIGUE_DROP_PCT
+            # generous padding: the first and last points sit on the window edges,
+            # and the flagged points carry a label below the mark
+            base = alt.Chart(wb).encode(
+                x=alt.X("date:T", title=None, axis=AXIS, scale=alt.Scale(padding=30)),
+                y=alt.Y("watts_per_bpm:Q", title="W per bpm", axis=AXIS,
+                        scale=alt.Scale(zero=False, nice=False, padding=34)))
+            tips = [alt.Tooltip("date:T", title="Date"), alt.Tooltip("run_type:N", title="Type"),
+                    alt.Tooltip("surface:N"), alt.Tooltip("avg_power_w:Q", title="power (W)"),
+                    alt.Tooltip("avg_hr:Q", title="HR"),
+                    alt.Tooltip("watts_per_bpm:Q", title="W/bpm", format=".3f"),
+                    alt.Tooltip("wbpm_delta_pct:Q", title="vs previous", format="+.1f"),
+                    alt.Tooltip("feel:N")]
+            w_line = base.mark_line(color=C_MUTED, strokeWidth=2).encode(order="date:T")
+            w_ok = base.transform_filter(alt.datum.fatigue_flag == False).mark_point(
+                size=90, filled=True, color=C_OUT, stroke="white", strokeWidth=2).encode(tooltip=tips)
+            w_bad = base.transform_filter(alt.datum.fatigue_flag).mark_point(
+                size=150, filled=True, color=C_CRIT, stroke="white", strokeWidth=2,
+                shape="triangle-down").encode(tooltip=tips)
+            w_tag = base.transform_filter(alt.datum.fatigue_flag).mark_text(
+                dy=18, fontSize=11, fontWeight=600, color=C_CRIT).encode(
+                text=alt.Text("wbpm_delta_pct:Q", format="+.1f"))
+            st.altair_chart(alt.layer(w_line, w_ok, w_bad, w_tag).properties(height=250)
                             .configure_view(strokeWidth=0), use_container_width=True)
-            st.caption("Work done per heartbeat. **Unlike pace or EF this is unaffected by terrain "
-                       "or heat**, which makes it the earliest fatigue signal — it caught the 2 Aug "
-                       "decoupling (1.61 → 1.54, a 4.5% loss in 24 h) before anything else did. "
-                       "All surfaces are included here on purpose.")
+            st.caption(f"Work done per heartbeat, **Z2 runs only** — mixing a tempo into this makes "
+                       "it unreadable. Power is indifferent to terrain and heat, which makes a sudden "
+                       "drop the earliest fatigue signal available: it caught the 2 Aug decoupling "
+                       f"(−4.5% in 24 h) before pace, HR or feel did. 🔻 = a drop of more than {drop}% "
+                       "against the previous qualifying run. **Treadmill is excluded** — no air "
+                       "resistance, so the numbers are not comparable; the 30 Jul field test is "
+                       "excluded too, since a maximal effort inflates W/bpm.")
+
+            flagged = wb[wb["fatigue_flag"]]
+            if not flagged.empty:
+                last = flagged.iloc[-1]
+                st.warning(f"**{last['date']:%d %b} — W/bpm down {abs(last['wbpm_delta_pct']):.1f}% "
+                           f"on the previous Z2 run.** Same intensity, less work per beat. Treat the "
+                           "next session as recovery unless the following run recovers the number.")
+
+            # the actionable comparison: the two most recent qualifying runs
+            st.markdown("**Last two qualifying Z2 runs**")
+            pair = wb.tail(2)
+            cmp_tbl = pd.DataFrame({
+                "": ["previous", "latest"],
+                "Date": [f"{d:%d %b}" for d in pair["date"]],
+                "Surface": pair["surface"].values,
+                "Power": [f"{p:.0f} W" for p in pair["avg_power_w"]],
+                "HR": [f"{h:.0f}" for h in pair["avg_hr"]],
+                "W/bpm": [f"{w:.3f}" for w in pair["watts_per_bpm"]],
+                "Δ": ["—", f"{pair.iloc[-1]['wbpm_delta_pct']:+.1f}%"],
+            })
+            st.dataframe(cmp_tbl, hide_index=True, use_container_width=True)
+            zi = int(wb["zone_inferred"].sum())
+            if zi:
+                st.caption(f"{zi} of these {len(wb)} runs had no time-in-zone recorded; "
+                           "an easy/long run type was treated as Z2 so the comparison isn't "
+                           "silently dropped. Log time-in-zone to remove the assumption.")
 
         # ---- pace trend vs target band ------------------------------------
         st.subheader("Easy/long pace vs the 6:10–6:15 outdoor target")
