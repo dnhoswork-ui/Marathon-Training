@@ -29,14 +29,17 @@ COLUMNS = [
     "z1_pct", "z2_pct", "z3_pct", "z4_pct", "z5_pct", "dominant_zone",
     "exercise_load", "te_aerobic",
     "gels_count", "gel_timing_km", "caffeine_gel_km",
-    "carbs_g_per_hour", "target_g_per_hour", "gut_tolerance",
+    "carbs_g_per_hour", "target_g_per_hour", "gut_tolerance", "fuel_product",
+    "prescribed_type", "prescribed_duration_min", "prescribed_pace",
+    "prescribed_distance_km", "prescribed_hr_ceiling", "adherence_flag", "adherence_note",
     "include_in_ef_trend", "notes",
 ]
 NUMERIC = ["distance_km", "pace_sec_per_km", "avg_hr", "max_hr", "cadence_spm", "stride_length_m",
            "vertical_osc_cm", "gct_ms", "avg_power_w", "grade_points", "feels_like_c",
            "hr_first_half", "hr_second_half",
            "z1_pct", "z2_pct", "z3_pct", "z4_pct", "z5_pct", "exercise_load", "te_aerobic",
-           "gels_count", "caffeine_gel_km", "carbs_g_per_hour", "target_g_per_hour"]
+           "gels_count", "caffeine_gel_km", "carbs_g_per_hour", "target_g_per_hour",
+           "prescribed_duration_min", "prescribed_distance_km", "prescribed_hr_ceiling"]
 API = "https://api.github.com"
 
 
@@ -82,6 +85,8 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
     df["include_in_ef_trend"] = (df["include_in_ef_trend"].astype(str).str.lower()
                                  .isin(["true", "1", "yes"])
                                  | df["include_in_ef_trend"].isna())
+    # adherence defaults to compliant: absent means "no deviation recorded"
+    df["adherence_flag"] = df["adherence_flag"].astype(str).str.lower().isin(["true", "1", "yes"])
     df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
     return df
 

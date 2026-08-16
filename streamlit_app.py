@@ -733,7 +733,58 @@ with tab_prog:
 
         st.divider()
 
-        # ---- weekly volume vs band + 10% flags ----------------------------
+        # ---- plan adherence: prescribed vs delivered ----------------------
+        pres = R[R["prescribed_type"].notna() & (R["prescribed_type"] != "")].sort_values("date")
+        if not pres.empty:
+            st.subheader("Plan adherence — prescribed vs delivered")
+            dev = pres[pres["adherence_flag"]]
+            a = st.columns(4)
+            a[0].metric("Sessions prescribed", len(pres))
+            a[1].metric("Deviations", len(dev),
+                        delta=f"{len(dev) / len(pres) * 100:.0f}% of sessions",
+                        delta_color="off")
+            over = pres[(pres["prescribed_distance_km"].notna())
+                        & (pres["distance_km"] > pres["prescribed_distance_km"])]
+            a[2].metric("Ran longer than prescribed", len(over))
+            unsched = pres[pres["prescribed_type"] == "rest"]
+            a[3].metric("Ran on a rest day", len(unsched))
+
+            def _delivered(r):
+                bits = [f"{r['distance_km']:.2f} km", r["avg_pace"]]
+                if pd.notna(r["avg_hr"]):
+                    bits.append(f"HR {r['avg_hr']:.0f}")
+                return " · ".join(bits)
+
+            def _prescribed(r):
+                if r["prescribed_type"] == "rest":
+                    return "REST"
+                bits = [str(r["prescribed_type"])]
+                if pd.notna(r["prescribed_duration_min"]):
+                    bits.append(f"{r['prescribed_duration_min']:.0f} min")
+                if pd.notna(r["prescribed_distance_km"]):
+                    bits.append(f"{r['prescribed_distance_km']:.0f} km")
+                if pd.notna(r["prescribed_pace"]) and str(r["prescribed_pace"]).strip():
+                    bits.append(f"@ {r['prescribed_pace']}")
+                if pd.notna(r["prescribed_hr_ceiling"]):
+                    bits.append(f"HR ≤ {r['prescribed_hr_ceiling']:.0f}")
+                return " · ".join(bits)
+
+            tbl = pd.DataFrame({
+                "": ["⚠️" if f else "✅" for f in pres["adherence_flag"]],
+                "Date": [f"{d:%d %b}" for d in pres["date"]],
+                "Prescribed": [_prescribed(r) for _, r in pres.iterrows()],
+                "Delivered": [_delivered(r) for _, r in pres.iterrows()],
+                "Note": pres["adherence_note"].fillna("").values,
+            })
+            st.dataframe(tbl, hide_index=True, use_container_width=True)
+            if not dev.empty:
+                st.warning(f"**{len(dev)} of {len(pres)} prescribed sessions deviated.** Each is minor "
+                           "on its own; the aggregate is what matters — consistently exceeding "
+                           "prescription raises load above what the plan budgeted for, which is how "
+                           "a good block turns into an overreaching one. The plan's progression "
+                           "assumes the prescription is the ceiling, not the floor.")
+
+        st.divider()
         st.subheader("Weekly volume vs plan band")
         wsum = R.groupby("week", as_index=False)["distance_km"].sum().rename(columns={"distance_km": "km"})
         all_weeks = pd.date_range(wsum["week"].min(), plan.RACE_DATE, freq="W-MON").date
@@ -821,6 +872,13 @@ with tab_prog:
                                           + (f" · gut: {f['gut_tolerance']}" if f["gut_tolerance"] else ""))
             st.caption("Race target is 60–90 g/h. Rate has to be trained — the gut adapts slower than "
                        "the legs, so the ladder steps up one gel per long run.")
+            latest = fuel.iloc[-1]
+            if pd.isna(latest["gut_tolerance"]) or not str(latest["gut_tolerance"]).strip():
+                st.warning(f"❓ **Gut tolerance not recorded for {latest['date']:%d %b}** "
+                           f"({int(latest['gels_count'])} gels"
+                           + (f", {latest['fuel_product']}" if latest["fuel_product"] else "") + "). "
+                           "This is the open decision: it determines whether the next long run steps "
+                           "up a gel or repeats at the same count. Add it on the Log runs tab.")
 
         st.divider()
 
